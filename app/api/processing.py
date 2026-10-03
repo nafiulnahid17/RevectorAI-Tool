@@ -1,0 +1,44 @@
+from fastapi import APIRouter, Request
+from app.api.schemas import StageRequest, GeometryRequest, SegmentRequest, ExportRequest
+
+router = APIRouter(prefix="/api/revector", tags=["processing jobs"])
+
+
+def submit(stage, body, request):
+    return request.app.state.queue.submit(body.project_id, stage, body.model_dump(exclude={"project_id"}, exclude_none=True))
+
+
+@router.post("/correct-geometry", status_code=202)
+def geometry(body: GeometryRequest, request: Request):
+    return submit("correct-geometry", body, request)
+
+
+@router.post("/segment", status_code=202)
+def segment(body: SegmentRequest, request: Request):
+    return submit("segment", body, request)
+
+
+@router.post("/export", status_code=202)
+def export(body: ExportRequest, request: Request):
+    return submit("export", body, request)
+
+
+def stage_handler(stage):
+    def handler(body: StageRequest, request: Request):
+        return submit(stage, body, request)
+    handler.__name__ = stage
+    return handler
+
+
+for stage in ["analyze", "reconstruct", "vectorize", "optimize", "compose", "validate"]:
+    router.add_api_route("/" + stage, stage_handler(stage), methods=["POST"], status_code=202)
+
+
+@router.get("/jobs/{job_id}")
+def job(job_id: str, request: Request):
+    return request.app.state.queue.get(job_id)
+
+
+@router.post("/jobs/{job_id}/cancel", status_code=202)
+def cancel(job_id: str, request: Request):
+    return request.app.state.queue.cancel(job_id)

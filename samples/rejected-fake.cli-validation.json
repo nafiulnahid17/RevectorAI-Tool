@@ -1,0 +1,43 @@
+{
+  "valid_svg": true,
+  "true_vector": false,
+  "illustrator_ready": false,
+  "illustrator_compatibility": "FAIL",
+  "status": "INVALID_VECTOR",
+  "embedded_rasters": 1,
+  "path_count": 0,
+  "group_count": 0,
+  "text_count": 0,
+  "gradient_count": 0,
+  "pattern_count": 0,
+  "clip_path_count": 0,
+  "total_anchor_count": 0,
+  "shape_count": 0,
+  "errors": [],
+  "warnings": [
+    "Raster artwork detected; fully editable/True Vector export prohibited",
+    "No meaningful vector artwork outside definitions"
+  ],
+  "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+  "raster_image_count": 1,
+  "raster_reference_count": 1,
+  "raster_references": [
+    {
+      "tag": "image",
+      "attribute": "href"
+    }
+  ],
+  "view_box": [
+    0.0,
+    0.0,
+    20.0,
+    20.0
+  ],
+  "meaningful_shape_count": 0,
+  "paths": 0,
+  "groups": 0,
+  "texts": 0,
+  "gradients": 0,
+  "patterns": 0,
+  "anchor_points": 0
+}

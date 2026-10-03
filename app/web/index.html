@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#6d3dee" />
+    <title>ReVector — Production Workspace</title>
+    <link rel="icon" href="/assets/mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/workspace.css" />
+    <script type="module" src="/workspace.js"></script>
+  </head>
+  <body>
+    <div id="app"><div class="boot">Connecting to ReVector Engine…</div></div>
+    <input
+      id="file-input"
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      hidden
+    />
+    <dialog id="report-dialog">
+      <header>
+        <h2>Vector validation report</h2>
+        <button id="close-report" class="icon-button" aria-label="Close report">
+          ×
+        </button>
+      </header>
+      <div id="report-content"></div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

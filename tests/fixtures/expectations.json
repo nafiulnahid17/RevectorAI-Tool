@@ -1,0 +1,44 @@
+{
+  "simple_2_color.png": {
+    "min_parts": 2,
+    "true_vector": true
+  },
+  "gradient.png": {
+    "linear_gradient_fit": true,
+    "true_vector": true
+  },
+  "splatter.png": {
+    "true_vector": true,
+    "approximation_expected": true
+  },
+  "text.png": {
+    "true_vector": true,
+    "no_exact_font_claim": true
+  },
+  "logo.png": {
+    "true_vector": true,
+    "holes_preserved": true
+  },
+  "low_resolution.png": {
+    "true_vector": true,
+    "lost_detail_unrecoverable": true
+  },
+  "perspective.png": {
+    "manual_corners_supported": true,
+    "true_vector": true
+  },
+  "shadowed.jpg": {
+    "lighting_is_heuristic": true,
+    "true_vector": true
+  },
+  "complex_panel.png": {
+    "min_parts": 1,
+    "identity": "unknown",
+    "true_vector": true
+  },
+  "multiple_panels.png": {
+    "min_parts": 2,
+    "identity": "unknown",
+    "true_vector": true
+  }
+}

@@ -1,0 +1,147 @@
+import {
+  API,
+  types,
+  stages,
+  state,
+  app,
+  escape,
+  label,
+  icon,
+  badge,
+  btn,
+  field,
+  checkbox,
+  part,
+  ready,
+  artifact,
+  picture,
+  dimensions,
+  toast,
+} from "./model.js";
+import { request, refresh } from "./api.js";
+import { render, highestStep } from "./views.js";
+import { upload, savePart, handle, updateSettings } from "./actions.js";
+app.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action]");
+  if (target) {
+    event.preventDefault();
+    handle(target.dataset.action, target).catch((error) => {
+      state.error = {
+        code: error.code || "INPUT_ERROR",
+        message: error.message,
+      };
+      render();
+    });
+  }
+});
+app.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (event.target.id === "part-form")
+    savePart().catch((error) => toast(error.message));
+});
+app.addEventListener("input", (event) => {
+  const el = event.target;
+  if (el.name?.startsWith("req-")) {
+    const r = state.requirements[el.closest("[data-index]").dataset.index];
+    r[
+      {
+        "req-name": "name",
+        "req-width": "width_mm",
+        "req-height": "height_mm",
+      }[el.name]
+    ] = el.value;
+  }
+  if (el.name === "project-name") state.projectName = el.value;
+  if (
+    el.name === "part-width" &&
+    document.querySelector('[name="aspect-lock"]')?.checked &&
+    part()
+  ) {
+    const h = document.querySelector('[name="part-height"]');
+    h.value = el.value
+      ? ((Number(el.value) * part().bbox[3]) / part().bbox[2]).toFixed(1)
+      : "";
+  }
+});
+app.addEventListener("change", (event) => {
+  const el = event.target;
+  if (el.name === "export-part") {
+    el.checked
+      ? state.selectedExports.add(el.value)
+      : state.selectedExports.delete(el.value);
+    render();
+  }
+  if (el.name === "size-requirement" && el.value !== "") {
+    const r = state.project.production_specifications[Number(el.value)];
+    document.querySelector('[name="part-name"]').value = r.name;
+    document.querySelector('[name="part-type"]').value = r.type;
+    document.querySelector('[name="part-width"]').value = r.width_mm;
+    document.querySelector('[name="part-height"]').value = r.height_mm;
+    document.querySelector('[name="aspect-lock"]').checked = false;
+  }
+  if (el.name === "perspective") state.autoGeometry = el.checked;
+  if (["noise", "colors", "ocr", "vector-mode"].includes(el.name)) {
+    const key = {
+      noise: "noise_reduction",
+      colors: "preserve_original_colors",
+      ocr: "ocr",
+      "vector-mode": "vector_mode",
+    }[el.name];
+    const value = el.name === "vector-mode" ? el.value : el.checked;
+    if (state.project) updateSettings({ [key]: value });
+    else {
+      if (el.name === "vector-mode") state.mode = value;
+      else state[el.name] = value;
+    }
+  }
+});
+app.addEventListener("dragover", (event) => {
+  const zone = event.target.closest("#dropzone");
+  if (zone) {
+    event.preventDefault();
+    zone.classList.add("drag-over");
+  }
+});
+app.addEventListener("dragleave", (event) =>
+  event.target.closest("#dropzone")?.classList.remove("drag-over"),
+);
+app.addEventListener("drop", (event) => {
+  if (event.target.closest("#dropzone")) {
+    event.preventDefault();
+    if (!state.busy) upload(event.dataTransfer.files[0]);
+  }
+});
+document.querySelector("#file-input").addEventListener("change", (event) => {
+  upload(event.target.files[0]);
+  event.target.value = "";
+});
+document
+  .querySelector("#close-report")
+  .addEventListener("click", () =>
+    document.querySelector("#report-dialog").close(),
+  );
+async function boot() {
+  try {
+    state.health = await request("/health");
+    const saved = localStorage.getItem("revector.project");
+    if (saved) {
+      try {
+        state.project = { project_id: saved };
+        await refresh();
+        state.requirements = state.project.production_specifications || [];
+        state.step = highestStep();
+      } catch {
+        state.project = null;
+        localStorage.removeItem("revector.project");
+      }
+    }
+  } catch (error) {
+    state.error = {
+      code: "ENGINE_UNAVAILABLE",
+      message:
+        "Could not connect to the engine. Start the server and reload this page.",
+    };
+  }
+  render();
+}
+boot();

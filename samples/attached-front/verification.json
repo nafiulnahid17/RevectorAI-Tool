@@ -1,0 +1,100 @@
+{
+  "input_file": "attached-input.jpg",
+  "input_sha256": "ea73cd7ac07d05f385d4ed3b8219b9e9849b0d535b47ef68400a768e12c651c2",
+  "input_dimensions": [
+    1280,
+    853
+  ],
+  "manual_corners": [
+    [
+      333,
+      144
+    ],
+    [
+      595,
+      144
+    ],
+    [
+      595,
+      517
+    ],
+    [
+      333,
+      517
+    ]
+  ],
+  "sample_scope": "Manually cropped and labeled front artwork inside the supplied UI screenshot; not automatic seven-part detection.",
+  "detected_parts": [
+    {
+      "part_id": "part_1da8f7c69d4444e6",
+      "type": "front_body",
+      "confirmed": true,
+      "bbox": [
+        0,
+        0,
+        263,
+        374
+      ],
+      "backend": "vtracer"
+    }
+  ],
+  "vector_paths": 158,
+  "groups": 11,
+  "anchor_count": 4767,
+  "embedded_rasters": 0,
+  "validation_status": "TRUE_VECTOR",
+  "illustrator_compatibility": "PASS_WITH_WARNINGS",
+  "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+  "render_succeeded": true,
+  "visual_metrics": {
+    "ssim": 0.8147773470213044,
+    "mean_absolute_rgb_error": 7.516195278664525,
+    "mean_delta_e_cie76": 4.813086032867432,
+    "edge_iou": 0.21454653113589262,
+    "metric_scale": 1,
+    "advisory": true,
+    "note": "Similarity does not establish production fidelity or pixel perfection."
+  },
+  "warnings": [
+    "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+  ],
+  "generated_export_files": [
+    "master.svg",
+    "master.pdf",
+    "master.eps",
+    "master.png",
+    "production-pack.zip"
+  ],
+  "export_errors": {},
+  "dependencies": {
+    "opencv": true,
+    "vtracer": true,
+    "potrace": false,
+    "inkscape": true,
+    "resvg": true,
+    "tesseract": true
+  },
+  "timings_ms": {
+    "analyze": 347.178,
+    "correct-geometry": 81.996,
+    "segment": 83.24,
+    "reconstruct": 197.061,
+    "vectorize": 163.65,
+    "optimize": 159.377,
+    "compose": 10.826,
+    "validate": 716.832,
+    "export": 2351.729
+  },
+  "pdf_embedded_images": 0,
+  "eps_raster_image_dictionaries": 0,
+  "eps_executed_cairo_image_calls": 0,
+  "eps_inspection_scope": "Inkscape/Cairo output inspection, not a general PostScript security validator.",
+  "automated_tests": {
+    "tests": 66,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "time_seconds": 7.788,
+    "scope": "Unit, imperfect-image fixtures, full API workflow, per-part correction/cache, raster/security rejection, resvg rendering, and real Inkscape PDF/EPS exports."
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "valid_svg": true,
+  "true_vector": true,
+  "illustrator_ready": true,
+  "illustrator_compatibility": "PASS_WITH_WARNINGS",
+  "status": "TRUE_VECTOR",
+  "embedded_rasters": 0,
+  "path_count": 158,
+  "group_count": 11,
+  "text_count": 0,
+  "gradient_count": 0,
+  "pattern_count": 0,
+  "clip_path_count": 0,
+  "total_anchor_count": 4767,
+  "shape_count": 158,
+  "errors": [],
+  "warnings": [
+    "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+  ],
+  "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+  "raster_image_count": 0,
+  "raster_reference_count": 0,
+  "raster_references": [],
+  "view_box": [
+    0.0,
+    0.0,
+    263.0,
+    374.0
+  ],
+  "meaningful_shape_count": 157,
+  "paths": 158,
+  "groups": 11,
+  "texts": 0,
+  "gradients": 0,
+  "patterns": 0,
+  "anchor_points": 4767,
+  "validated_sha256": "2ffde628e52f7bc4f61172446072455ed5b2a86161e5a2305f24619e059b1055",
+  "render_succeeded": true,
+  "visual_comparison": {
+    "ssim": 0.8147773470213044,
+    "mean_absolute_rgb_error": 7.516195278664525,
+    "mean_delta_e_cie76": 4.813086032867432,
+    "edge_iou": 0.21454653113589262,
+    "metric_scale": 1,
+    "advisory": true,
+    "note": "Similarity does not establish production fidelity or pixel perfection."
+  },
+  "parts": [
+    {
+      "part_id": "part_1da8f7c69d4444e6",
+      "part": "front_body",
+      "paths": 158,
+      "anchors": 4767,
+      "rasters": 0,
+      "status": "PASS"
+    }
+  ],
+  "file_size_bytes": 189916
+}

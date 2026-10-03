@@ -1,0 +1,23 @@
+"""Optional providers supply evidence, never vector validity or invented confidence."""
+from typing import Protocol
+from PIL import Image
+import numpy as np
+
+
+class VisionProvider(Protocol):
+    def analyze_image(self, image: Image.Image) -> dict: ...
+    def classify_regions(self, image: Image.Image) -> list[dict]: ...
+    def describe_artwork(self, image: Image.Image) -> dict: ...
+
+
+class ReconstructionProvider(Protocol):
+    def reconstruct_region(self, image: Image.Image, metadata: dict) -> Image.Image: ...
+    def restore_missing_pattern(self, image: Image.Image, mask: np.ndarray) -> Image.Image: ...
+
+
+class SegmentationProvider(Protocol):
+    def segment(self, image: Image.Image, points: list | None = None) -> tuple[list[np.ndarray], dict]: ...
+
+
+class OCRProvider(Protocol):
+    def detect(self, image: Image.Image) -> list[dict]: ...

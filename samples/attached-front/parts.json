@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Front artwork (manually selected from UI screenshot)",
+    "type": "front_body",
+    "confirmed": true,
+    "polygon": [
+      [
+        0,
+        0
+      ],
+      [
+        262,
+        0
+      ],
+      [
+        262,
+        373
+      ],
+      [
+        0,
+        373
+      ]
+    ]
+  }
+]

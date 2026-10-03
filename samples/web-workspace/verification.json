@@ -1,0 +1,86 @@
+{
+  "project_id": "b8e0fb46-ce32-4885-86d3-6b4e4704f066",
+  "detected_parts": 2,
+  "validation": {
+    "valid_svg": true,
+    "true_vector": true,
+    "illustrator_ready": true,
+    "illustrator_compatibility": "PASS",
+    "status": "TRUE_VECTOR",
+    "embedded_rasters": 0,
+    "path_count": 122,
+    "group_count": 22,
+    "text_count": 0,
+    "gradient_count": 0,
+    "pattern_count": 0,
+    "clip_path_count": 0,
+    "total_anchor_count": 2609,
+    "shape_count": 122,
+    "errors": [],
+    "warnings": [],
+    "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+    "raster_image_count": 0,
+    "raster_reference_count": 0,
+    "raster_references": [],
+    "view_box": [
+      0,
+      0,
+      520,
+      240
+    ],
+    "meaningful_shape_count": 120,
+    "paths": 122,
+    "groups": 22,
+    "texts": 0,
+    "gradients": 0,
+    "patterns": 0,
+    "anchor_points": 2609,
+    "validated_sha256": "fb6635efe77411bf9db96897fa475adc4be64eed3fc906b0da34e02b73579018",
+    "render_succeeded": true,
+    "visual_comparison": {
+      "ssim": 0.8933688718983066,
+      "mean_absolute_rgb_error": 6.666995192307692,
+      "mean_delta_e_cie76": 4.4388508796691895,
+      "edge_iou": 0.3816245666171372,
+      "metric_scale": 1,
+      "advisory": true,
+      "note": "Similarity does not establish production fidelity or pixel perfection."
+    },
+    "parts": [
+      {
+        "part_id": "part_35598704e519436f",
+        "part": "front_body",
+        "paths": 61,
+        "anchors": 1318,
+        "rasters": 0,
+        "status": "PASS",
+        "validated_sha256": "7d0160ce6d23409d84aa418d3f826d5c77431616582f9d7628b73c39e62d2da5",
+        "physical_width_mm": 520,
+        "physical_height_mm": 421.4
+      },
+      {
+        "part_id": "part_df9dead478714549",
+        "part": "back_body",
+        "paths": 61,
+        "anchors": 1291,
+        "rasters": 0,
+        "status": "PASS",
+        "validated_sha256": "3bd25f6c133f71ac412d9246507f85a800ece00ffeb19d41bf66e6cc546427f3",
+        "physical_width_mm": 540,
+        "physical_height_mm": 437.6
+      }
+    ],
+    "file_size_bytes": 107057
+  },
+  "browser_errors": [],
+  "downloaded_files": [
+    "individual.svg",
+    "individual.pdf",
+    "selected-parts.zip",
+    "production-pack.zip"
+  ],
+  "tested_viewports": [
+    "1440x1050",
+    "390x844"
+  ]
+}

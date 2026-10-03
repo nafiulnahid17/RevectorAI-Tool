@@ -1,0 +1,1106 @@
+{
+  "project_id": "502f3f53-b021-4c89-acbf-90e677649b26",
+  "name": "Attached screenshot – recorded front artwork crop",
+  "user_id": null,
+  "request_id": null,
+  "state": "READY",
+  "engine_version": "0.1.0",
+  "source_file": "projects/502f3f53-b021-4c89-acbf-90e677649b26/source/ea73cd7ac07d05f385d4ed3b8219b9e9849b0d535b47ef68400a768e12c651c2.jpg",
+  "source_hash": "ea73cd7ac07d05f385d4ed3b8219b9e9849b0d535b47ef68400a768e12c651c2",
+  "source_metadata": {
+    "format": "JPEG",
+    "mime": "image/jpeg",
+    "original_dimensions": [
+      1280,
+      853
+    ],
+    "normalized_dimensions": [
+      1280,
+      853
+    ],
+    "exif_orientation": 1,
+    "exif_orientation_applied": false,
+    "icc_profile_present": true,
+    "color_space": "RGB working values; ICC conversion not performed",
+    "bytes": 134605,
+    "sha256": "ea73cd7ac07d05f385d4ed3b8219b9e9849b0d535b47ef68400a768e12c651c2"
+  },
+  "working_image": "projects/502f3f53-b021-4c89-acbf-90e677649b26/working/normalized.png",
+  "corrected_image": "projects/502f3f53-b021-4c89-acbf-90e677649b26/working/corrected.png",
+  "thumbnail": "projects/502f3f53-b021-4c89-acbf-90e677649b26/previews/thumbnail.png",
+  "settings": {
+    "preset": "BALANCED",
+    "vector_mode": "color",
+    "max_colors": 16,
+    "delta_e": 5.0,
+    "min_region_area": 6.0,
+    "segment_min_area_ratio": 0.01,
+    "noise_reduction": true,
+    "preserve_original_colors": true,
+    "ocr": false,
+    "text_mode": "outlined",
+    "gradients": true,
+    "allow_contour_fallback": true,
+    "max_trace_dimension": null,
+    "export_mode": "true_vector",
+    "known_width_mm": null,
+    "bleed_mm": 0.0,
+    "safe_zone_mm": 0.0
+  },
+  "analysis": {
+    "resolution": {
+      "width": 1280,
+      "height": 853,
+      "aspect_ratio": 1.5005861664712778
+    },
+    "analysis_scale": 1.0,
+    "quality": {
+      "sharpness_laplacian_variance": 2172.340087890625,
+      "blur_score": 0.0440074971756663,
+      "contrast": 0.26246127486228943,
+      "brightness": 0.8472104072570801,
+      "noise_score": 0.0,
+      "compression_blocking_estimate": 0.002278350293636322,
+      "possible_glare_fraction": 0.6469098036342321,
+      "possible_shadow_fraction": 0.03786085873388042,
+      "perspective_issue": false,
+      "lighting_issue": true
+    },
+    "dominant_colors": [
+      {
+        "rgb": [
+          254,
+          254,
+          254
+        ],
+        "fraction": 0.23558671600234465
+      },
+      {
+        "rgb": [
+          244,
+          246,
+          250
+        ],
+        "fraction": 0.2167387162954279
+      },
+      {
+        "rgb": [
+          113,
+          80,
+          171
+        ],
+        "fraction": 0.17650296746776084
+      },
+      {
+        "rgb": [
+          240,
+          238,
+          246
+        ],
+        "fraction": 0.12733001172332942
+      },
+      {
+        "rgb": [
+          248,
+          249,
+          251
+        ],
+        "fraction": 0.1152861225087925
+      },
+      {
+        "rgb": [
+          253,
+          252,
+          253
+        ],
+        "fraction": 0.07103513335287222
+      },
+      {
+        "rgb": [
+          254,
+          254,
+          251
+        ],
+        "fraction": 0.03066016998827667
+      },
+      {
+        "rgb": [
+          253,
+          254,
+          255
+        ],
+        "fraction": 0.02686016266119578
+      }
+    ],
+    "method_notes": [
+      "Blur, glare, shadows, JPEG blocking and perspective are heuristics; solid white/black graphics can trigger lighting flags."
+    ]
+  },
+  "geometry": {
+    "method": "manual_homography",
+    "corners": [
+      [
+        333.0,
+        144.0
+      ],
+      [
+        595.0,
+        144.0
+      ],
+      [
+        595.0,
+        517.0
+      ],
+      [
+        333.0,
+        517.0
+      ]
+    ],
+    "matrix": [
+      [
+        1.0,
+        7.49987302262038e-18,
+        -333.0
+      ],
+      [
+        4.7767578874628587e-17,
+        1.0,
+        -144.00000000000003
+      ],
+      [
+        -7.270764543316009e-20,
+        1.4541529086632018e-19,
+        1.0
+      ]
+    ],
+    "inverse_matrix": [
+      [
+        1.0,
+        -5.5923164881105e-17,
+        333.0
+      ],
+      [
+        -3.729767793225353e-17,
+        1.0,
+        144.0
+      ],
+      [
+        7.27076454331601e-20,
+        -1.4541529086632018e-19,
+        1.0
+      ]
+    ],
+    "output_dimensions": [
+      263,
+      374
+    ],
+    "crop_applied": true,
+    "discarded_area_recorded": "All source pixels outside the recorded quadrilateral are excluded."
+  },
+  "parts": [
+    {
+      "part_id": "part_1da8f7c69d4444e6",
+      "type": "front_body",
+      "name": "Front artwork (manually selected from UI screenshot)",
+      "bbox": [
+        0,
+        0,
+        263,
+        374
+      ],
+      "mask": "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/mask.png",
+      "source_crop": "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/source_crop.png",
+      "corrected_crop": "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/corrected_crop.png",
+      "polygon": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          262.0,
+          0.0
+        ],
+        [
+          262.0,
+          373.0
+        ],
+        [
+          0.0,
+          373.0
+        ]
+      ],
+      "confirmed": true,
+      "locked": false,
+      "confidence": null,
+      "clean_reference": "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/clean_reference.png",
+      "vectorization_source": "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/vectorization_source.png",
+      "palette": [
+        {
+          "id": "color_00",
+          "index": 0,
+          "hex": "#fafaf8",
+          "rgb": [
+            250,
+            250,
+            248
+          ],
+          "pixel_count": 15491,
+          "fraction": 0.15748968097436003
+        },
+        {
+          "id": "color_01",
+          "index": 1,
+          "hex": "#d8bfd9",
+          "rgb": [
+            216,
+            191,
+            217
+          ],
+          "pixel_count": 10809,
+          "fraction": 0.10988999817002501
+        },
+        {
+          "id": "color_02",
+          "index": 2,
+          "hex": "#7137c1",
+          "rgb": [
+            113,
+            55,
+            193
+          ],
+          "pixel_count": 9066,
+          "fraction": 0.09216974034688193
+        },
+        {
+          "id": "color_03",
+          "index": 3,
+          "hex": "#1f0e35",
+          "rgb": [
+            31,
+            14,
+            53
+          ],
+          "pixel_count": 17975,
+          "fraction": 0.18274333584107683
+        },
+        {
+          "id": "color_04",
+          "index": 4,
+          "hex": "#461b7e",
+          "rgb": [
+            70,
+            27,
+            126
+          ],
+          "pixel_count": 13708,
+          "fraction": 0.1393627620422521
+        },
+        {
+          "id": "color_05",
+          "index": 5,
+          "hex": "#a376d4",
+          "rgb": [
+            163,
+            118,
+            212
+          ],
+          "pixel_count": 8583,
+          "fraction": 0.08725930745613143
+        },
+        {
+          "id": "color_06",
+          "index": 6,
+          "hex": "#b792d7",
+          "rgb": [
+            183,
+            146,
+            215
+          ],
+          "pixel_count": 6785,
+          "fraction": 0.06897989060816169
+        },
+        {
+          "id": "color_07",
+          "index": 7,
+          "hex": "#5e2ea3",
+          "rgb": [
+            94,
+            46,
+            163
+          ],
+          "pixel_count": 5993,
+          "fraction": 0.060928000650657774
+        },
+        {
+          "id": "color_08",
+          "index": 8,
+          "hex": "#ceb0dc",
+          "rgb": [
+            206,
+            176,
+            220
+          ],
+          "pixel_count": 2640,
+          "fraction": 0.026839633191679715
+        },
+        {
+          "id": "color_09",
+          "index": 9,
+          "hex": "#371a5e",
+          "rgb": [
+            55,
+            26,
+            94
+          ],
+          "pixel_count": 4880,
+          "fraction": 0.049612655293710985
+        },
+        {
+          "id": "color_10",
+          "index": 10,
+          "hex": "#8051bd",
+          "rgb": [
+            128,
+            81,
+            189
+          ],
+          "pixel_count": 1441,
+          "fraction": 0.014649966450458511
+        },
+        {
+          "id": "color_11",
+          "index": 11,
+          "hex": "#e9dbeb",
+          "rgb": [
+            233,
+            219,
+            235
+          ],
+          "pixel_count": 991,
+          "fraction": 0.010075028974604014
+        }
+      ],
+      "ocr_results": [],
+      "decomposition": {
+        "edge_density": 0.07620829182001179,
+        "edge_component_count": 204,
+        "region_classes": [
+          "SOLID_SHAPE"
+        ],
+        "classification_method": "edge_density_heuristic",
+        "semantic_logo_detection": "unavailable",
+        "pattern_detection": "not_implemented",
+        "palette_size": 12
+      },
+      "vector": "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/part_1da8f7c69d4444e6.optimized.svg",
+      "metrics": {
+        "before_paths": 157,
+        "before_anchors": 4762,
+        "embedded_rasters": 0,
+        "backend": "vtracer",
+        "trace_metadata": {
+          "backend": "vtracer",
+          "parameters": {
+            "epsilon": 0.7,
+            "area_factor": 1,
+            "color_precision": 6,
+            "filter_speckle": 4,
+            "path_precision": 3
+          },
+          "trace_scale": 1.0,
+          "source_dimensions": [
+            263,
+            374
+          ],
+          "warnings": []
+        },
+        "after_paths": 157,
+        "initial_anchor_count": 4762,
+        "final_anchor_count": 4762,
+        "simplification_ratio": 0.0,
+        "line_tolerance_px": 0.7,
+        "warnings": [],
+        "curve_cleanup": "Existing cubic curves retained; no unbounded curve fitting applied.",
+        "paths": 157,
+        "anchors": 4762,
+        "rasters": 0,
+        "status": "PASS",
+        "visual_difference": {
+          "ssim": 0.8147773470213044,
+          "mean_absolute_rgb_error": 7.516195278664525,
+          "mean_delta_e_cie76": 4.813086032867432,
+          "edge_iou": 0.21454653113589262,
+          "metric_scale": 1,
+          "advisory": true,
+          "note": "Similarity does not establish production fidelity or pixel perfection."
+        }
+      },
+      "cache": {
+        "reconstruct": "9983b33fd60fbb791739b8cde319e04351cd0974013b106a59766b35a00494f5",
+        "vectorize": "41257c7fada6392c6ba274068a17d5c30798b81fa27679f1eb7fed2abe2ebf92",
+        "optimize": "3b8b8af6744d80892b0f6a9a459b669a07051b86b8a0d8c84105a0bf58e0511c"
+      },
+      "warnings": []
+    }
+  ],
+  "manual_changes": [
+    {
+      "action": "segment",
+      "parts": [
+        {
+          "name": "Front artwork (manually selected from UI screenshot)",
+          "type": "front_body",
+          "confirmed": true,
+          "polygon": [
+            [
+              0,
+              0
+            ],
+            [
+              262,
+              0
+            ],
+            [
+              262,
+              373
+            ],
+            [
+              0,
+              373
+            ]
+          ]
+        }
+      ],
+      "timestamp": "2026-10-03T18:31:47.061229+00:00"
+    }
+  ],
+  "palette": [
+    {
+      "id": "color_00",
+      "index": 0,
+      "hex": "#fafaf8",
+      "rgb": [
+        250,
+        250,
+        248
+      ],
+      "pixel_count": 15491,
+      "fraction": 0.15748968097436003
+    },
+    {
+      "id": "color_01",
+      "index": 1,
+      "hex": "#d8bfd9",
+      "rgb": [
+        216,
+        191,
+        217
+      ],
+      "pixel_count": 10809,
+      "fraction": 0.10988999817002501
+    },
+    {
+      "id": "color_02",
+      "index": 2,
+      "hex": "#7137c1",
+      "rgb": [
+        113,
+        55,
+        193
+      ],
+      "pixel_count": 9066,
+      "fraction": 0.09216974034688193
+    },
+    {
+      "id": "color_03",
+      "index": 3,
+      "hex": "#1f0e35",
+      "rgb": [
+        31,
+        14,
+        53
+      ],
+      "pixel_count": 17975,
+      "fraction": 0.18274333584107683
+    },
+    {
+      "id": "color_04",
+      "index": 4,
+      "hex": "#461b7e",
+      "rgb": [
+        70,
+        27,
+        126
+      ],
+      "pixel_count": 13708,
+      "fraction": 0.1393627620422521
+    },
+    {
+      "id": "color_05",
+      "index": 5,
+      "hex": "#a376d4",
+      "rgb": [
+        163,
+        118,
+        212
+      ],
+      "pixel_count": 8583,
+      "fraction": 0.08725930745613143
+    },
+    {
+      "id": "color_06",
+      "index": 6,
+      "hex": "#b792d7",
+      "rgb": [
+        183,
+        146,
+        215
+      ],
+      "pixel_count": 6785,
+      "fraction": 0.06897989060816169
+    },
+    {
+      "id": "color_07",
+      "index": 7,
+      "hex": "#5e2ea3",
+      "rgb": [
+        94,
+        46,
+        163
+      ],
+      "pixel_count": 5993,
+      "fraction": 0.060928000650657774
+    },
+    {
+      "id": "color_08",
+      "index": 8,
+      "hex": "#ceb0dc",
+      "rgb": [
+        206,
+        176,
+        220
+      ],
+      "pixel_count": 2640,
+      "fraction": 0.026839633191679715
+    },
+    {
+      "id": "color_09",
+      "index": 9,
+      "hex": "#371a5e",
+      "rgb": [
+        55,
+        26,
+        94
+      ],
+      "pixel_count": 4880,
+      "fraction": 0.049612655293710985
+    },
+    {
+      "id": "color_10",
+      "index": 10,
+      "hex": "#8051bd",
+      "rgb": [
+        128,
+        81,
+        189
+      ],
+      "pixel_count": 1441,
+      "fraction": 0.014649966450458511
+    },
+    {
+      "id": "color_11",
+      "index": 11,
+      "hex": "#e9dbeb",
+      "rgb": [
+        233,
+        219,
+        235
+      ],
+      "pixel_count": 991,
+      "fraction": 0.010075028974604014
+    }
+  ],
+  "cache": {
+    "analyze": {
+      "signature": "9c03c507f4dc96c6b6077a6075380a6ab47ee836517d5db7608ee52bfea57db2",
+      "artifacts": {}
+    },
+    "correct-geometry": {
+      "signature": "20c87ec2e352cdb0897812efab86a06c760ed91a6a889eab1548508f692cf494",
+      "artifacts": {
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/working/corrected.png": "2e1d7f07f2ea2d92a095524ca298146f2fa0fa9cc369cb318e37a3e78333e8e7"
+      }
+    },
+    "segment": {
+      "signature": "a498318e3d9ae49c4925d967636189cbfa6f35b030c96734db5cd6837dc708b2",
+      "artifacts": {
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/mask.png": "85f32464b56fdc9e917d294d1a8219c13f2af8b5c1f6fc07fbfab2e4655efbe9",
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/source_crop.png": "2e1d7f07f2ea2d92a095524ca298146f2fa0fa9cc369cb318e37a3e78333e8e7",
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/parts/part_1da8f7c69d4444e6/corrected_crop.png": "2e1d7f07f2ea2d92a095524ca298146f2fa0fa9cc369cb318e37a3e78333e8e7"
+      }
+    },
+    "compose": {
+      "signature": "12cdafa52c0cd40d9679a036e202da3c24fb12f6f7f0f026007c444eb527e52a",
+      "artifacts": {
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/master.svg": "2ffde628e52f7bc4f61172446072455ed5b2a86161e5a2305f24619e059b1055",
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/part_1da8f7c69d4444e6.svg": "2ffde628e52f7bc4f61172446072455ed5b2a86161e5a2305f24619e059b1055"
+      }
+    }
+  },
+  "stage_metadata": {
+    "ingest": {
+      "format": "JPEG",
+      "mime": "image/jpeg",
+      "original_dimensions": [
+        1280,
+        853
+      ],
+      "normalized_dimensions": [
+        1280,
+        853
+      ],
+      "exif_orientation": 1,
+      "exif_orientation_applied": false,
+      "icc_profile_present": true,
+      "color_space": "RGB working values; ICC conversion not performed",
+      "bytes": 134605,
+      "sha256": "ea73cd7ac07d05f385d4ed3b8219b9e9849b0d535b47ef68400a768e12c651c2",
+      "timestamp": "2026-10-03T18:31:46.542210+00:00",
+      "source_resolution_preserved": true
+    },
+    "analyze": {
+      "analysis": {
+        "resolution": {
+          "width": 1280,
+          "height": 853,
+          "aspect_ratio": 1.5005861664712778
+        },
+        "analysis_scale": 1.0,
+        "quality": {
+          "sharpness_laplacian_variance": 2172.340087890625,
+          "blur_score": 0.0440074971756663,
+          "contrast": 0.26246127486228943,
+          "brightness": 0.8472104072570801,
+          "noise_score": 0.0,
+          "compression_blocking_estimate": 0.002278350293636322,
+          "possible_glare_fraction": 0.6469098036342321,
+          "possible_shadow_fraction": 0.03786085873388042,
+          "perspective_issue": false,
+          "lighting_issue": true
+        },
+        "dominant_colors": [
+          {
+            "rgb": [
+              254,
+              254,
+              254
+            ],
+            "fraction": 0.23558671600234465
+          },
+          {
+            "rgb": [
+              244,
+              246,
+              250
+            ],
+            "fraction": 0.2167387162954279
+          },
+          {
+            "rgb": [
+              113,
+              80,
+              171
+            ],
+            "fraction": 0.17650296746776084
+          },
+          {
+            "rgb": [
+              240,
+              238,
+              246
+            ],
+            "fraction": 0.12733001172332942
+          },
+          {
+            "rgb": [
+              248,
+              249,
+              251
+            ],
+            "fraction": 0.1152861225087925
+          },
+          {
+            "rgb": [
+              253,
+              252,
+              253
+            ],
+            "fraction": 0.07103513335287222
+          },
+          {
+            "rgb": [
+              254,
+              254,
+              251
+            ],
+            "fraction": 0.03066016998827667
+          },
+          {
+            "rgb": [
+              253,
+              254,
+              255
+            ],
+            "fraction": 0.02686016266119578
+          }
+        ],
+        "method_notes": [
+          "Blur, glare, shadows, JPEG blocking and perspective are heuristics; solid white/black graphics can trigger lighting flags."
+        ]
+      },
+      "duration_ms": 347.178,
+      "timestamp": "2026-10-03T18:31:46.891673+00:00",
+      "job_id": null
+    },
+    "correct-geometry": {
+      "geometry": {
+        "method": "manual_homography",
+        "corners": [
+          [
+            333.0,
+            144.0
+          ],
+          [
+            595.0,
+            144.0
+          ],
+          [
+            595.0,
+            517.0
+          ],
+          [
+            333.0,
+            517.0
+          ]
+        ],
+        "matrix": [
+          [
+            1.0,
+            7.49987302262038e-18,
+            -333.0
+          ],
+          [
+            4.7767578874628587e-17,
+            1.0,
+            -144.00000000000003
+          ],
+          [
+            -7.270764543316009e-20,
+            1.4541529086632018e-19,
+            1.0
+          ]
+        ],
+        "inverse_matrix": [
+          [
+            1.0,
+            -5.5923164881105e-17,
+            333.0
+          ],
+          [
+            -3.729767793225353e-17,
+            1.0,
+            144.0
+          ],
+          [
+            7.27076454331601e-20,
+            -1.4541529086632018e-19,
+            1.0
+          ]
+        ],
+        "output_dimensions": [
+          263,
+          374
+        ],
+        "crop_applied": true,
+        "discarded_area_recorded": "All source pixels outside the recorded quadrilateral are excluded."
+      },
+      "duration_ms": 81.996,
+      "timestamp": "2026-10-03T18:31:46.976406+00:00",
+      "job_id": null
+    },
+    "segment": {
+      "detected_parts": 1,
+      "segmentation": {
+        "method": "manual_polygons",
+        "warnings": [],
+        "confidence": null
+      },
+      "duration_ms": 83.24,
+      "timestamp": "2026-10-03T18:31:47.061793+00:00",
+      "job_id": null
+    },
+    "reconstruct": {
+      "parts": {
+        "part_1da8f7c69d4444e6": {
+          "operations": [
+            "mask_background_removal",
+            "bilateral_denoise_sigma12"
+          ],
+          "shadow_reconstruction": "not_applied",
+          "glare_reconstruction": "not_applied",
+          "color_normalization": "preserved",
+          "reference_dimensions": [
+            263,
+            374
+          ],
+          "quantization": {
+            "max_colors": 16,
+            "delta_e_cie76": 5.0
+          }
+        }
+      },
+      "cached": false,
+      "duration_ms": 197.061,
+      "timestamp": "2026-10-03T18:31:47.260794+00:00",
+      "job_id": null
+    },
+    "vectorize": {
+      "parts": {
+        "part_1da8f7c69d4444e6": {
+          "backend": "vtracer",
+          "parameters": {
+            "epsilon": 0.7,
+            "area_factor": 1,
+            "color_precision": 6,
+            "filter_speckle": 4,
+            "path_precision": 3
+          },
+          "trace_scale": 1.0,
+          "source_dimensions": [
+            263,
+            374
+          ],
+          "warnings": [],
+          "metrics": {
+            "before_paths": 157,
+            "before_anchors": 4762,
+            "embedded_rasters": 0,
+            "backend": "vtracer",
+            "trace_metadata": {
+              "backend": "vtracer",
+              "parameters": {
+                "epsilon": 0.7,
+                "area_factor": 1,
+                "color_precision": 6,
+                "filter_speckle": 4,
+                "path_precision": 3
+              },
+              "trace_scale": 1.0,
+              "source_dimensions": [
+                263,
+                374
+              ],
+              "warnings": []
+            }
+          }
+        }
+      },
+      "cached": false,
+      "duration_ms": 163.65,
+      "timestamp": "2026-10-03T18:31:47.426611+00:00",
+      "job_id": null
+    },
+    "optimize": {
+      "parts": {
+        "part_1da8f7c69d4444e6": {
+          "before_paths": 157,
+          "after_paths": 157,
+          "initial_anchor_count": 4762,
+          "final_anchor_count": 4762,
+          "simplification_ratio": 0.0,
+          "line_tolerance_px": 0.7,
+          "warnings": [],
+          "curve_cleanup": "Existing cubic curves retained; no unbounded curve fitting applied."
+        }
+      },
+      "cached": false,
+      "duration_ms": 159.377,
+      "timestamp": "2026-10-03T18:31:47.589159+00:00",
+      "job_id": null
+    },
+    "compose": {
+      "master_svg": "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/master.svg",
+      "part_files": [
+        "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/part_1da8f7c69d4444e6.svg"
+      ],
+      "dimensions": "uncalibrated",
+      "duration_ms": 10.826,
+      "timestamp": "2026-10-03T18:31:47.602132+00:00",
+      "job_id": null
+    },
+    "validate": {
+      "validation": {
+        "valid_svg": true,
+        "true_vector": true,
+        "illustrator_ready": true,
+        "illustrator_compatibility": "PASS_WITH_WARNINGS",
+        "status": "TRUE_VECTOR",
+        "embedded_rasters": 0,
+        "path_count": 158,
+        "group_count": 11,
+        "text_count": 0,
+        "gradient_count": 0,
+        "pattern_count": 0,
+        "clip_path_count": 0,
+        "total_anchor_count": 4767,
+        "shape_count": 158,
+        "errors": [],
+        "warnings": [
+          "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+        ],
+        "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+        "raster_image_count": 0,
+        "raster_reference_count": 0,
+        "raster_references": [],
+        "view_box": [
+          0.0,
+          0.0,
+          263.0,
+          374.0
+        ],
+        "meaningful_shape_count": 157,
+        "paths": 158,
+        "groups": 11,
+        "texts": 0,
+        "gradients": 0,
+        "patterns": 0,
+        "anchor_points": 4767,
+        "validated_sha256": "2ffde628e52f7bc4f61172446072455ed5b2a86161e5a2305f24619e059b1055",
+        "render_succeeded": true,
+        "visual_comparison": {
+          "ssim": 0.8147773470213044,
+          "mean_absolute_rgb_error": 7.516195278664525,
+          "mean_delta_e_cie76": 4.813086032867432,
+          "edge_iou": 0.21454653113589262,
+          "metric_scale": 1,
+          "advisory": true,
+          "note": "Similarity does not establish production fidelity or pixel perfection."
+        },
+        "parts": [
+          {
+            "part_id": "part_1da8f7c69d4444e6",
+            "part": "front_body",
+            "paths": 158,
+            "anchors": 4767,
+            "rasters": 0,
+            "status": "PASS"
+          }
+        ],
+        "file_size_bytes": 189916
+      },
+      "duration_ms": 716.832,
+      "timestamp": "2026-10-03T18:31:48.321040+00:00",
+      "job_id": null
+    },
+    "export": {
+      "exports": {
+        "svg": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.svg",
+        "pdf": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.pdf",
+        "eps": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.eps",
+        "png": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.png",
+        "zip": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/production-pack.zip"
+      },
+      "export_errors": {},
+      "success": true,
+      "duration_ms": 2351.729,
+      "timestamp": "2026-10-03T18:31:50.674631+00:00",
+      "job_id": null
+    }
+  },
+  "master_svg": "projects/502f3f53-b021-4c89-acbf-90e677649b26/vectors/master.svg",
+  "validation": {
+    "valid_svg": true,
+    "true_vector": true,
+    "illustrator_ready": true,
+    "illustrator_compatibility": "PASS_WITH_WARNINGS",
+    "status": "TRUE_VECTOR",
+    "embedded_rasters": 0,
+    "path_count": 158,
+    "group_count": 11,
+    "text_count": 0,
+    "gradient_count": 0,
+    "pattern_count": 0,
+    "clip_path_count": 0,
+    "total_anchor_count": 4767,
+    "shape_count": 158,
+    "errors": [],
+    "warnings": [
+      "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+    ],
+    "compatibility_scope": "Static SVG feature checks; Adobe Illustrator has not been executed.",
+    "raster_image_count": 0,
+    "raster_reference_count": 0,
+    "raster_references": [],
+    "view_box": [
+      0.0,
+      0.0,
+      263.0,
+      374.0
+    ],
+    "meaningful_shape_count": 157,
+    "paths": 158,
+    "groups": 11,
+    "texts": 0,
+    "gradients": 0,
+    "patterns": 0,
+    "anchor_points": 4767,
+    "validated_sha256": "2ffde628e52f7bc4f61172446072455ed5b2a86161e5a2305f24619e059b1055",
+    "render_succeeded": true,
+    "visual_comparison": {
+      "ssim": 0.8147773470213044,
+      "mean_absolute_rgb_error": 7.516195278664525,
+      "mean_delta_e_cie76": 4.813086032867432,
+      "edge_iou": 0.21454653113589262,
+      "metric_scale": 1,
+      "advisory": true,
+      "note": "Similarity does not establish production fidelity or pixel perfection."
+    },
+    "parts": [
+      {
+        "part_id": "part_1da8f7c69d4444e6",
+        "part": "front_body",
+        "paths": 158,
+        "anchors": 4767,
+        "rasters": 0,
+        "status": "PASS"
+      }
+    ],
+    "file_size_bytes": 189916
+  },
+  "previews": {
+    "reference": "projects/502f3f53-b021-4c89-acbf-90e677649b26/previews/reference.png",
+    "vector_render": "projects/502f3f53-b021-4c89-acbf-90e677649b26/previews/vector_render.png",
+    "difference": "projects/502f3f53-b021-4c89-acbf-90e677649b26/previews/difference.png",
+    "vector_view": "projects/502f3f53-b021-4c89-acbf-90e677649b26/previews/vector_view.svg",
+    "nodes": "projects/502f3f53-b021-4c89-acbf-90e677649b26/reports/nodes.json"
+  },
+  "exports": {
+    "svg": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.svg",
+    "pdf": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.pdf",
+    "eps": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.eps",
+    "png": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/master.png",
+    "zip": "projects/502f3f53-b021-4c89-acbf-90e677649b26/exports/production-pack.zip"
+  },
+  "usage": {
+    "processing_ms": 4111.888999999999,
+    "ai_calls": 0,
+    "export_operations": 5,
+    "input_megapixels": 1.09184,
+    "output_paths": 158,
+    "output_anchors": 4767
+  },
+  "warnings": [],
+  "error": null,
+  "created_at": "2026-10-03T18:31:46.163159+00:00",
+  "updated_at": "2026-10-03T18:31:50.674650+00:00"
+}
