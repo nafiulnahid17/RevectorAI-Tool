@@ -1,62 +1,39 @@
-# ReVector — Web Workspace & Core Engine
+# ReVector Core Engine
 
-A runnable Python 3.12 deterministic raster-to-vector backend for JerseyOS.
-It builds editable paths and groups, validates them, renders them with resvg,
-and exports real SVG, PDF and EPS. An API-connected browser workspace is served
-by the same FastAPI process. No image-generation API is required.
+Python 3.12 raster-to-vector API for JerseyOS. This repository contains **only the
+engine**, processing stages, validators, exports, CLI and backend tests.
 
-**An SVG extension does not establish vector artwork.** True Vector export
-requires real geometry and zero raster images/references. PNG-in-SVG wrappers
-are rejected. Raster-only artwork is INVALID_VECTOR; genuine vectors plus raster
-artwork are HYBRID_VECTOR and cannot be exported as True Vector.
+The website is maintained separately in
+[RevectorAi-WEB](https://github.com/nafiulnahid17/RevectorAi-WEB) and runs on
+Cloudflare Workers. The engine runs on Railway or another Python/Docker server.
+The browser calls its own Cloudflare origin; only the server-side Worker holds the
+engine credential and connects to the engine over HTTPS.
 
-This is a tested deterministic core release, not a finished autonomous photo-to-
-garment reconstruction system. It does not recover obscured artwork, identify
-garment side labels from appearance, or certify print/cut dimensions without
-calibration. Its static Illustrator checks are not an Adobe Illustrator runtime
-test. Review the measured sample report and limitations below.
+**An SVG extension does not establish vector artwork.** True Vector requires real
+geometry, valid SVG, rendered validation and zero raster images/references.
+No fake `.ai` files or PNG-in-SVG wrappers are exported. OpenAI is not connected;
+the deterministic pipeline does not require an AI API key.
 
 ## Local installation
 
 ```bash
-cd revector-engine
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
+# Set a random REVECTOR_API_KEY of at least 32 characters in .env.
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Open **http://127.0.0.1:8000/** for the web tool. API documentation is at `/docs`.
-The web interface is included in the Python package and Docker image: no Node
-build step, separate frontend server or CORS configuration is required.
+`/health` is public liveness; `/health/ready` performs actual readiness checks.
+API routes and developer documentation require the trusted gateway bearer key.
+Project/job/artifact requests also require `X-Revector-User`, supplied by the trusted
+server-side gateway. Every referenced project must belong to that identity.
+Missing configuration fails closed. No permissive cross-origin browser access is
+provided. For isolated local debugging only, `REVECTOR_ALLOW_UNAUTHENTICATED=true`
+explicitly disables gateway authentication; do not set it on a deployed engine.
 
-Opening `app/web/index.html` directly or in an attachment preview displays the
-workspace interface. Actual processing requires opening the page from the running
-engine address above. Offline previews show connection guidance instead of waiting
-indefinitely. See the web integration notes for rebuilding the bundled HTML after
-editing frontend sources.
-
-## Browser workflow
-
-1. Upload raster artwork, or try the bundled jersey/multiple-panel samples.
-2. Analyze source quality and detect parts. Automatic perspective is opt-in.
-3. Select each component, rename it, assign its category, supply dimensions and
-   save/confirm it. Add/redraw polygons or provide four perspective corners when needed.
-4. Vectorize: reconstruction, tracing, cleanup, composition and rendered validation
-   run as background jobs. Progress and cancellation use the actual engine job API.
-5. Compare the clean raster and vector, inspect real layers, or view paths. Select
-   a vector shape to change its solid fill; edits require composition/revalidation.
-6. Download individual SVG/EPS/PDF files, a selected-parts ZIP, the master or a full
-   production ZIP. Downloads are gated by the current validated geometry hashes.
-
-The interface restores the latest project in the same browser. It does not invent
-part labels, confidence scores, measurements, validation metrics or successful exports.
-OpenAI is explicitly **not connected**; no OpenAI API requests are made. Native
-`.AI` remains unavailable without Adobe Illustrator automation.
-
-See [web integration notes](docs/WEB_WORKSPACE.md) for physical sizing, testing
-and deployment details. Figma mockup: https://www.figma.com/design/p49n14O798ZY4d3eHpcxVG
+See [secure connection](docs/SECURE_CONNECTION.md) and [Railway setup](docs/RAILWAY.md).
 
 On Debian/Ubuntu, install optional production conversion and OCR tools:
 
@@ -83,26 +60,28 @@ See [architecture](docs/ARCHITECTURE.md) for the local queue's deployment limits
 
 ## Railway
 
-Deploy this repository as a Railway Docker service, attach a persistent volume at
-`/engine/data`, and generate a public domain after `/health/ready` passes. The image
-honors Railway's `PORT` and serves the interface and API together. The frontend
-shows Server / Engine / Tool lights and Ready; Retry appears only for failed checks.
-Follow [Railway deployment](docs/RAILWAY.md) for exact variables and verification.
-The engine should be private behind JerseyOS authentication; it deliberately
-does not implement host billing or user authentication.
+Deploy this repository as a Docker service with a persistent `/engine/data` volume,
+set `REVECTOR_API_KEY` as a Railway secret, and generate an HTTPS domain after
+`/health/ready` passes. `PORT` is read automatically. One replica and one worker are
+required by the local queue. This service serves the API, not website files.
 
 ## API workflow
 
-Open `http://127.0.0.1:8000/docs` for exact request models and try-it-out controls.
+Developer documentation is at `/docs` and requires bearer authentication.
+See `docs/API.md` for the static API contract. Set ENGINE_API_KEY in your trusted
+operator environment for the examples below; never put it in browser code.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/revector/projects \
+  -H "Authorization: Bearer $ENGINE_API_KEY" -H "X-Revector-User: operator-local" \
   -H 'Content-Type: application/json' \
   -d '{"name":"Front artwork","settings":{"preset":"BALANCED","vector_mode":"color"}}'
 # Use the returned project_id in each subsequent request.
 curl -s http://127.0.0.1:8000/api/revector/upload \
+  -H "Authorization: Bearer $ENGINE_API_KEY" -H "X-Revector-User: operator-local" \
   -F 'project_id=REPLACE_WITH_UUID' -F 'file=@artwork.png;type=image/png'
 curl -s http://127.0.0.1:8000/api/revector/analyze \
+  -H "Authorization: Bearer $ENGINE_API_KEY" -H "X-Revector-User: operator-local" \
   -H 'Content-Type: application/json' -d '{"project_id":"REPLACE_WITH_UUID"}'
 ```
 

@@ -1,8 +1,8 @@
 {
-  "tests": 66,
+  "tests": 81,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
-  "time_seconds": 7.788,
-  "scope": "Unit, imperfect-image fixtures, full API workflow, per-part correction/cache, raster/security rejection, resvg rendering, and real Inkscape PDF/EPS exports."
+  "time_seconds": 8.844,
+  "scope": "Backend unit/integration tests, imperfect images, SVG integrity, rendering, real EPS/PDF exports, gateway authentication, ownership isolation and chunked upload limits."
 }

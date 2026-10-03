@@ -1,79 +1,74 @@
-# Railway deployment
+# Railway engine deployment
 
-Deploy the repository `nafiulnahid17/RevectorAI-Tool`, branch `main`, as one Railway
-service. Both the browser workspace and `/api/revector` are served by this service.
-Railway reads the committed `railway.json` and builds the committed Dockerfile.
-The image includes OpenCV, VTracer, Potrace, resvg, Inkscape and Tesseract.
+Deploy `nafiulnahid17/RevectorAI-Tool`, branch `main`, as a Docker service.
+This repository serves the engine API only. Deploy the website separately from
+[RevectorAi-WEB](https://github.com/nafiulnahid17/RevectorAi-WEB) to Cloudflare Workers.
 
-## Service configuration
+## Configuration
 
-1. Create a Railway service from the GitHub repository; use repository root `/`.
-2. Attach a persistent Railway volume mounted at `/engine/data` before deploying.
-   `requiredMountPath` prevents an accidental deployment without that volume.
-3. Set the variables below. Do not override the Docker start command. Railway
-   supplies `PORT`; the launcher binds `0.0.0.0` at that port.
-4. Deploy, wait for `/health/ready` to pass, then generate a Railway public domain
-   for the service. The domain root opens the workspace.
+1. Connect the engine repository, using repository root `/`.
+2. Attach a persistent volume mounted at `/engine/data` before deploying.
+3. Set the variables below. Generate a random API key of at least 32 characters
+   (for example, `openssl rand -hex 32`) and keep it in Railway's secret variables.
+4. Keep the Docker start command: `PORT` is read automatically.
+5. Deploy, verify `/health/ready`, then generate a Railway HTTPS public domain.
 
 | Variable | Value |
 | --- | --- |
+| `REVECTOR_API_KEY` | Private random gateway key |
+| `REVECTOR_ALLOW_UNAUTHENTICATED` | `false` |
 | `REVECTOR_DATA_DIR` | `/engine/data` |
 | `REVECTOR_WORKER_THREADS` | `2` |
 | `REVECTOR_SYNC_JOBS` | `false` |
 | `REVECTOR_STORAGE_BACKEND` | `local` |
 
-Use one replica and one API worker with the local queue. The image's launcher
-initializes volume ownership, then drops to UID 10001 before starting the API.
-Project artifacts and job metadata survive replacement containers on this volume.
-Interrupted processing jobs are reported as failed after restart and can be
-resubmitted; a local worker does not resume a native trace mid-operation.
+Set the website's `ENGINE_ORIGIN` to that HTTPS origin (without a path). Store the
+identical API key as its Cloudflare `ENGINE_API_KEY` secret. Give the website an
+independent random `SESSION_SIGNING_KEY` secret. No keys belong in browser code.
+See [secure connection](SECURE_CONNECTION.md) for identity and authorization.
 
-`railway.json` defines Docker build, `/health/ready`, a 180-second health-check
-timeout, one replica, no overlap, 190-second draining and bounded failure restarts.
-No OpenAI key is required for the deterministic workflow. The OpenAI provider is
-not implemented/connected in this release; adding an environment key alone does
-not activate AI. Authentication/credits remain a JerseyOS integration responsibility.
+Use one replica and one API process with the local queue. The launcher initializes
+volume ownership then drops to UID 10001. Artifacts and manifests persist across
+replacement containers. Interrupted processing jobs become failed after restart;
+resubmit them explicitly. Jobs do not resume a native trace mid-operation.
 
-## Connection indicators
+`railway.json` configures Docker build, `/health/ready`, a 180-second health timeout,
+one replica, required volume, no overlap and bounded failure restarts.
+The image includes Inkscape, Potrace, Tesseract and Python CV/vector dependencies.
+OpenAI is not connected in this release; adding a key does not activate AI.
 
-The frontend shows three small status lights, with no setup banner:
+## Readiness and verification
 
-- Server: a successful response from the actual ReVector `/health` endpoint.
-- Engine: initialization, OpenCV availability, real paths-only SVG validation and
-  a successful resvg render in `/health/ready`.
-- Tool: the engine checks plus an actual storage write/read, queue initialization,
-  workspace availability and Inkscape availability.
-
-All three must pass to display **Ready** and enable uploads. Checks use five-second
-request timeouts. Pending lights pulse; failure lights are red. A Retry control
-appears only next to a failed segment. Retrying runs the actual checks again.
-Browser readiness is separate from each project's True Vector validation: exports
-still require validated geometry and zero raster references.
-
-## Verify a deployed service
-
-Replace `YOUR_SERVICE_DOMAIN` with the domain Railway actually generated:
+Public `/health` checks liveness. `/health/ready` checks engine initialization,
+OpenCV, actual paths-only SVG validation/rendering, storage write/read, queue,
+Inkscape and authentication configuration. Missing authentication fails readiness.
+A request presenting an incorrect bearer key is rejected even on readiness.
+API, job and artifact routes require authentication and project ownership.
 
 ```bash
-curl -f https://YOUR_SERVICE_DOMAIN/health
-curl -f https://YOUR_SERVICE_DOMAIN/health/ready
-REVECTOR_TEST_URL=https://YOUR_SERVICE_DOMAIN node scripts/browser-smoke.cjs
+curl -f https://YOUR_ENGINE_DOMAIN/health
+curl -f https://YOUR_ENGINE_DOMAIN/health/ready
+# In a trusted operator environment only:
+curl -f https://YOUR_ENGINE_DOMAIN/api/revector/projects/PROJECT_UUID \
+  -H "Authorization: Bearer $ENGINE_API_KEY" \
+  -H "X-Revector-User: OWNER_IDENTITY"
 ```
 
-The browser smoke script requires Playwright and Chromium as documented in
-`WEB_WORKSPACE.md`. It executes real upload, analysis, segmentation, sizing, tracing,
-validation, editing and download checks. Never report a Railway URL as deployed
-until the deployment is successful and those remote checks have been executed.
+The Cloudflare UI shows Server, Engine and Tool lights. Server checks the actual
+Worker; Engine and Tool check the authenticated upstream readiness response.
+Ready requires all three, with retry controls only on failed segments.
+Run the browser smoke script from the website repository against its deployed URL
+before claiming the hosted workflow works.
 
-## Local container verification
+## Local container
+
+Copy `.env.example` to `.env` and set `REVECTOR_API_KEY` before running:
 
 ```bash
 docker compose up --build
 curl -f http://localhost:8000/health/ready
 ```
 
-The container accepts a custom `PORT` and a freshly mounted volume. Docker Compose
-grants only CHOWN, SETUID and SETGID for volume initialization; the API runs non-root.
-In a managed environment using a TLS proxy, supply its combined trusted CA bundle
-as the optional BuildKit secret `proxy_ca` when building. The CA mount is ephemeral,
-and ordinary Railway builds use pip's normal certificate verification.
+Compose grants only CHOWN, SETUID and SETGID for volume initialization; the API runs
+non-root. Optional BuildKit secret `proxy_ca` supports managed TLS-proxy networks;
+ordinary Railway builds use normal certificate verification.

@@ -1,12 +1,18 @@
 # API contract
 
 OpenAPI: `GET /openapi.json`. Interactive documentation: `GET /docs`.
+Both require `Authorization: Bearer <REVECTOR_API_KEY>`. Every `/api/revector`
+request also requires `X-Revector-User: <trusted-owner-identity>` from the server-side
+gateway. Project/job/artifact access is owner-checked. Browsers use the Cloudflare
+website proxy; never expose the engine credential to clients. Missing credentials
+return 401; missing engine configuration returns 503. Cross-owner access returns 404.
+See [secure connection](SECURE_CONNECTION.md).
 All identifiers are server-generated UUIDs. Artifacts use relative storage keys.
 Processing errors return a stable `error.code`, public-safe `message` and
 `recoverable` flag. Job errors appear in polling responses.
 
 1. `POST /api/revector/projects` with JSON `{ "name": "Jersey", "user_id": "host-user", "settings": { "preset": "BALANCED", "vector_mode": "color" } }`.
-2. `POST /api/revector/upload` with multipart `project_id` and `file`. Content-Length is required. Content bytes, MIME and extension must agree.
+2. `POST /api/revector/upload` with multipart `project_id` and `file`. Content-Length is checked when present; streamed/chunked multipart bodies are also size-bounded. Content bytes, MIME and extension must agree.
 3. `POST /api/revector/analyze` with `{ "project_id": "UUID" }`.
 4. `POST /api/revector/correct-geometry` with the same JSON for identity, or add `"corners": [[x,y],[x,y],[x,y],[x,y]]`. `"auto": true` explicitly authorizes a recorded automatic artboard crop. Coordinates refer to the normalized source.
 5. `POST /api/revector/segment`. Optional `parts` is a list of `{ "name": "Front", "type": "front_body", "confirmed": true, "polygon": [[x,y],...] }`. Coordinates refer to the corrected image.

@@ -65,8 +65,10 @@ The R2Storage adapter implements real S3-compatible object operations. Processin
 and job records currently use local disk; automatic R2 mirroring and remote project
 orchestration are not implemented. Setting an unsupported backend fails clearly.
 
-The engine is intended to run on a private network behind JerseyOS. The host must
-authenticate requests, authorize every project and job id, enforce per-user limits,
-and handle billing. `user_id` and `request_id` are validated length-limited metadata,
-not credentials. Usage records expose durations, input megapixels, provider calls,
-output complexity and export operations without billing coupling.
+The engine accepts only a configured, constant-time checked gateway bearer key. The
+trusted gateway supplies `X-Revector-User`; API routes authorize every referenced
+project, job and artifact against this stored owner. Website sources and the
+Cloudflare Worker live in a separate repository. The Worker overwrites browser
+identity/credential headers and injects its verified session identity. Account
+login, rate limits, credits and billing remain host-application responsibilities.
+See `SECURE_CONNECTION.md` for the trust boundary and deployment settings.

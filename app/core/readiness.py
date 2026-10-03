@@ -1,15 +1,15 @@
 """Independent, measured readiness checks for the server, engine and web tool."""
 import logging
 from tempfile import NamedTemporaryFile
-from pathlib import Path
 from app.core.config import capabilities
 from app.validators.svg_validator import validate_svg
 from app.validators.visual_diff import render_svg
+from app.core.security import configured
 
 PROBE_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><g id="probe"><path d="M0 0H16V16H0Z" fill="#6d3dee"/></g></svg>'
 
 
-def readiness(app, web_root: Path) -> dict:
+def readiness(app) -> dict:
     dependencies = capabilities()
     checks = {}
     checks['engine_initialized'] = bool(getattr(app.state, 'runtime_ready', False))
@@ -35,7 +35,7 @@ def readiness(app, web_root: Path) -> dict:
             storage_ok = probe.read() == b'ReVector readiness'
     except (AttributeError, OSError):
         storage_ok = False
-    tool_checks = {'storage': storage_ok, 'workspace': (web_root / 'index.html').is_file(),
+    tool_checks = {'storage': storage_ok, 'gateway_auth': configured(app.state.engine.settings) or app.state.engine.settings.allow_unauthenticated,
                    'queue': hasattr(app.state, 'queue') and checks['engine_initialized'],
                    'vector_conversion': dependencies['inkscape']}
     tool_ok = engine_ok and all(tool_checks.values())

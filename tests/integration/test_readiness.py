@@ -6,7 +6,7 @@ import app.core.readiness as checks
 
 
 def test_ready_server_runs_vector_and_storage_probes(tmp_path):
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path))) as client:
         response = client.get('/health/ready')
         assert response.status_code == 200
         report = response.json()
@@ -22,7 +22,7 @@ def test_live_server_is_not_ready_when_vector_renderer_fails(tmp_path, monkeypat
     def failed_render(_data):
         raise RuntimeError('Renderer failed')
     monkeypatch.setattr(checks, 'render_svg', failed_render)
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path))) as client:
         assert client.get('/health').status_code == 200
         response = client.get('/health/ready')
         assert response.status_code == 503
@@ -35,7 +35,7 @@ def test_storage_failure_marks_tool_red_and_keeps_engine_connected(tmp_path, mon
     def failed_storage(*_args, **_kwargs):
         raise PermissionError('Storage unavailable')
     monkeypatch.setattr(checks, 'NamedTemporaryFile', failed_storage)
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path))) as client:
         response = client.get('/health/ready')
         assert response.status_code == 503
         segments = response.json()['segments']

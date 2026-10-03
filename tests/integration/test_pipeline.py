@@ -50,7 +50,7 @@ def test_mono_fallback_explicit(engine):
 
 
 def test_api_staged_workflow(tmp_path, simple_bytes):
-    with TestClient(create_app(Settings(data_dir=tmp_path, sync_jobs=True))) as client:
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path, sync_jobs=True))) as client:
         assert client.get("/health").json()["dependencies"]["opencv"]
         p = client.post("/api/revector/projects", json={"name": "API test", "settings": {"vector_mode": "precision"}}).json()
         pid = p["project_id"]

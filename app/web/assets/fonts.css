@@ -1,8 +1,0 @@
-/* System fallback keeps the workspace functional without third-party network requests. */
-@font-face {
-  font-family: Inter;
-  src: local("Inter");
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-}

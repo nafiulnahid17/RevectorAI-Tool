@@ -3,7 +3,7 @@ from pathlib import Path
 import importlib.util
 import shutil
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, SecretStr
 
 
 class Settings(BaseSettings):
@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     ocr_provider: str = "tesseract"
     segmentation_provider: str = "opencv"
     storage_backend: str = "local"
+    api_key: SecretStr | None = None
+    allow_unauthenticated: bool = False
     r2_endpoint: str | None = None
     r2_bucket: str | None = None
     r2_access_key_id: str | None = None

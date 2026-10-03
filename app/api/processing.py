@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Request
+from app.core.security import project_access
 from app.api.schemas import StageRequest, GeometryRequest, SegmentRequest, ExportRequest
 
 router = APIRouter(prefix="/api/revector", tags=["processing jobs"])
 
 
 def submit(stage, body, request):
+    project_access(request, body.project_id)
     return request.app.state.queue.submit(body.project_id, stage, body.model_dump(exclude={"project_id"}, exclude_none=True))
 
 
@@ -36,9 +38,12 @@ for stage in ["analyze", "reconstruct", "vectorize", "optimize", "compose", "val
 
 @router.get("/jobs/{job_id}")
 def job(job_id: str, request: Request):
-    return request.app.state.queue.get(job_id)
+    result = request.app.state.queue.get(job_id)
+    project_access(request, result["project_id"])
+    return result
 
 
 @router.post("/jobs/{job_id}/cancel", status_code=202)
 def cancel(job_id: str, request: Request):
+    project_access(request, request.app.state.queue.get(job_id)["project_id"])
     return request.app.state.queue.cancel(job_id)

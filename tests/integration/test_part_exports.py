@@ -12,23 +12,6 @@ from app.core.exceptions import EngineError
 from tests.integration.test_pipeline import complete
 
 
-def test_served_workspace_and_static_assets(tmp_path):
-    with TestClient(create_app(Settings(data_dir=tmp_path))) as client:
-        assert 'ReVector' in client.get('/').text
-        assert client.get('/workspace.js').headers['content-type'].startswith('text/javascript')
-        assert client.get('/assets/sample-panel.png').content.startswith(b'\x89PNG')
-        assert client.get('/health').json()['ai_required'] is False
-        # HTML attachment previews cannot resolve root CSS paths or module imports.
-        html = client.get('/').text
-        assert '<style>' in html and '<script>' in html
-        assert 'type="module"' not in html
-        assert 'src="./workspace.js"' not in html
-        assert 'href="./workspace.css"' not in html
-        assert 'data-connection="server"' in html
-        assert 'data-connection="engine"' in html
-        assert 'data-connection="tool"' in html
-
-
 def test_part_measurements_in_export_and_selective_zip(engine):
     p = complete(engine)
     first, second = p.parts
@@ -108,7 +91,7 @@ def test_individual_vector_pdf_eps_and_pack(engine):
 
 
 def test_project_manifest_exposes_part_download_but_no_unlisted_file(tmp_path, simple_bytes):
-    with TestClient(create_app(Settings(data_dir=tmp_path, sync_jobs=True))) as client:
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path, sync_jobs=True))) as client:
         engine = client.app.state.engine
         p = complete(engine)
         pid, part_id = p.project_id, p.parts[0].part_id

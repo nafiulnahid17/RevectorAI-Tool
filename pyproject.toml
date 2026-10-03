@@ -25,9 +25,6 @@ revector = "app.cli:main"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
-[tool.setuptools.package-data]
-app = ["web/*", "web/assets/*"]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
