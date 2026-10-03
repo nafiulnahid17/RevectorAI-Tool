@@ -128,20 +128,49 @@ async function boot() {
   if (boot.running) return;
   boot.running = true;
   state.connecting = true;
+  state.health = null;
+  state.connections = { server: "pending", engine: "pending", tool: "pending" };
+  state.connectionMessage = "";
   render();
   try {
     if (location.protocol === "file:" || location.origin === "null") {
-      throw new Error("A downloaded HTML preview has no engine server.");
+      throw new Error("The server could not be reached from this preview.");
     }
-    state.health = await request("/health");
-    if (state.health?.engine !== "ReVector" || state.health?.status !== "ok") {
-      throw new Error("This address is not serving ReVector Engine.");
+    const server = await request("/health");
+    if (server?.engine !== "ReVector" || server?.status !== "ok") {
+      throw new Error("ReVector server did not respond.");
     }
+    state.connections.server = "connected";
+    render();
+    let report;
+    try {
+      report = await request("/health/ready");
+    } catch (error) {
+      if (!error.data?.segments) throw error;
+      report = error.data;
+    }
+    if (report?.engine !== "ReVector" || !report.segments) {
+      throw new Error("The engine readiness check did not respond.");
+    }
+    for (const key of ["engine", "tool"]) {
+      state.connections[key] =
+        report.segments[key]?.status === "connected" ? "connected" : "failed";
+    }
+    if (
+      Object.values(state.connections).some((status) => status !== "connected")
+    ) {
+      state.connectionMessage =
+        state.connections.engine === "failed"
+          ? "Engine checks failed."
+          : "Tool checks failed.";
+      return;
+    }
+    state.health = report;
     let saved;
     try {
       saved = localStorage.getItem("revector.project");
     } catch {}
-    if (saved) {
+    if (saved && !state.project) {
       try {
         state.project = { project_id: saved };
         await refresh();
@@ -155,11 +184,24 @@ async function boot() {
       }
     }
   } catch (error) {
-    state.health = null;
+    const failed =
+      state.connections.server !== "connected" ? "server" : "engine";
+    state.connections[failed] = "failed";
+    if (failed === "server") {
+      state.connections.engine = "waiting";
+      state.connections.tool = "waiting";
+    } else {
+      state.connections.tool = "waiting";
+    }
+    state.connectionMessage =
+      failed === "server"
+        ? "Server connection failed."
+        : "Engine connection failed.";
   } finally {
     state.connecting = false;
     boot.running = false;
+    render();
   }
-  render();
 }
-boot();
+if (globalThis.REVECTOR_PRERENDER) render();
+else boot();

@@ -11,6 +11,7 @@ from app.core.engine import Engine
 from app.core.exceptions import EngineError
 from app.jobs.queue import LocalJobQueue
 from app.api import projects, upload, processing
+from app.core.readiness import readiness
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -21,9 +22,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         from starlette.concurrency import run_in_threadpool
         app.state.engine = Engine(settings)
         app.state.queue = LocalJobQueue(app.state.engine)
+        app.state.runtime_ready = True
         logging.basicConfig(level=logging.INFO, format="%(message)s")
         logging.getLogger("revector").info("ReVector startup capabilities=%s", capabilities())
         yield
+        app.state.runtime_ready = False
         await run_in_threadpool(app.state.queue.shutdown)
 
     app = FastAPI(title="ReVector Core Engine", version=__version__, lifespan=lifespan,
@@ -52,6 +55,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         return {"status": "ok", "engine": "ReVector", "version": __version__, "dependencies": capabilities(),
                 "queue": "local_thread", "ai_required": False}
+
+    @app.get("/health/ready", tags=["health"])
+    def ready_health():
+        report = readiness(app, Path(__file__).parent / "web")
+        return JSONResponse(status_code=200 if report['status'] == 'ready' else 503, content=report,
+                            headers={"Cache-Control": "no-store"})
 
     app.include_router(projects.router)
     app.include_router(upload.router)

@@ -1,0 +1,65 @@
+{
+  "target": "local Docker verification of Railway configuration",
+  "railway_live_deployed": false,
+  "dynamic_port": 8090,
+  "persistent_volume": "PASS",
+  "project_after_container_replacement": "5367965e-1399-4d80-b501-0f25ebd17122",
+  "ready_checks": {
+    "status": "ready",
+    "engine": "ReVector",
+    "segments": {
+      "server": {
+        "status": "connected"
+      },
+      "engine": {
+        "status": "connected",
+        "checks": {
+          "engine_initialized": true,
+          "opencv": true,
+          "renderer": true,
+          "vector_validator": true,
+          "vector_render": true
+        }
+      },
+      "tool": {
+        "status": "connected",
+        "checks": {
+          "storage": true,
+          "workspace": true,
+          "queue": true,
+          "vector_conversion": true
+        }
+      }
+    },
+    "dependencies": {
+      "opencv": true,
+      "vtracer": true,
+      "potrace": true,
+      "inkscape": true,
+      "resvg": true,
+      "tesseract": true
+    },
+    "ai_required": false
+  },
+  "docker_browser_workflow": "PASS",
+  "eps_pdf_exports": {
+    "eps": {
+      "signature_valid": true,
+      "bytes": 112773
+    },
+    "pdf": {
+      "signature_valid": true,
+      "bytes": 37104
+    }
+  },
+  "final_project": "144a8346-1af5-488e-ba89-e7771632e5d8",
+  "paths": 122,
+  "embedded_rasters": 0,
+  "browser_errors": [],
+  "api_runtime_uid": 10001,
+  "tested_image": "sha256:8a503069e78531e690afb249dfb379ea412fd8257fa22fbdbc0177180c667df4",
+  "compose_configuration": "PASS",
+  "railway_schema_validation": "PASS",
+  "backend_tests_passed": 77,
+  "live_deployment_blocker": "Railway deployment tools are not available in this session, despite app installation and reconnection."
+}

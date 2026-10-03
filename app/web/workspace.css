@@ -1063,41 +1063,93 @@ dialog pre {
   }
 }
 
-.connection-notice {
-  margin: 0 28px 18px;
-  padding: 18px 22px;
+.connection-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  background: var(--amber-soft);
-  border: 1px solid #ead9b5;
-  border-radius: 12px;
-}
-.connection-notice p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.connection-actions {
-  display: flex;
   gap: 12px;
-  flex-shrink: 0;
-  align-items: center;
+  padding: 10px 28px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
 }
-.engine-link {
-  color: var(--brand);
+.connection-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+.connection-segment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+.status-light {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #bcc0cb;
+}
+.connection-segment.connected {
+  color: var(--green);
+}
+.connection-segment.connected .status-light {
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.connection-segment.failed {
+  color: var(--red);
+}
+.connection-segment.failed .status-light {
+  background: var(--red);
+  box-shadow: 0 0 0 3px #fce8ec;
+}
+.connection-segment.pending .status-light {
+  background: var(--brand);
+  animation: connection-pulse 1s ease-in-out infinite;
+}
+.connection-retry {
+  border: 0;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--red);
+  text-decoration: underline;
+  font-size: 11px;
+}
+.connection-summary {
+  color: var(--muted);
   font-weight: 600;
   white-space: nowrap;
 }
-@media (max-width: 900px) {
-  .connection-notice {
-    margin: 0 12px 12px;
-    align-items: flex-start;
-    flex-direction: column;
+.connection-summary.ready {
+  color: var(--green);
+}
+@keyframes connection-pulse {
+  50% {
+    opacity: 0.25;
   }
-  .connection-actions {
+}
+@media (prefers-reduced-motion: reduce) {
+  .connection-segment.pending .status-light {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .connection-status {
+    padding: 10px 12px;
+    align-items: flex-start;
+    font-size: 10px;
+  }
+  .connection-segments {
+    gap: 8px 12px;
+  }
+  .connection-segment {
+    gap: 5px;
     flex-wrap: wrap;
+  }
+  .connection-retry {
+    font-size: 10px;
   }
 }

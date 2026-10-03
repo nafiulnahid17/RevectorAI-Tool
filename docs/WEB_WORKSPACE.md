@@ -5,22 +5,21 @@ Its relative `/api/revector` URLs use the same host as the engine. Every process
 button submits a real job and polls its persisted status. Errors retain machine
 codes. No fixture vectors or invented results are substituted for uploaded artwork.
 
-## HTML previews and connection recovery
+## HTML previews and connection status
 
-The shipped `app/web/index.html` contains its CSS, bundled JavaScript and favicon.
-It can display the workspace inside an HTML attachment preview or from `file://`
-without resolving module imports or root asset URLs. It displays the initial
-interface even when a preview blocks scripts, using markup generated from the
-same UI sources. Interactive controls require JavaScript. With scripts enabled,
-the browser renders the interface before attempting health checks. A failed or stalled check stops after
-five seconds, displays the engine connection instructions, and offers retry.
-Uploads and processing require the real engine and remain disabled while offline.
-An HTML attachment is a visual workspace preview, not a deployed Python server.
+The shipped `app/web/index.html` contains CSS, bundled JavaScript, a favicon and
+initial markup generated from the same UI sources. Even script-restricted previews
+show the interface. Interactive controls and checks require JavaScript.
 
-To process artwork, open `http://localhost:8000/` on the machine running the engine
-(or the configured server URL). The preview cannot reach a server just because it
-is running on a separate cloud machine. Sandboxed storage failures do not prevent
-the interface from rendering or processing when the engine is reachable.
+The frontend shows small Server / Engine / Tool lights. All real checks must pass
+before Ready appears and upload is enabled. Pending lights pulse, failed lights
+are red, and Retry is shown only on failed segments. There is no setup/retry banner.
+See `RAILWAY.md` for what each segment checks. Each connection request times out
+within five seconds; a retry makes actual requests rather than changing UI flags.
+
+An attachment preview is not a Python server. To process artwork, open the running
+engine domain or `http://localhost:8000/` on its machine. Sandboxed storage failures
+do not prevent the interface from rendering or processing when the engine is reachable.
 
 Modular UI sources remain editable. After changing `app/web/*.js`,
 `workspace.css` or `workspace.template.html`, regenerate the committed HTML:
@@ -99,7 +98,8 @@ saves screenshots, real downloaded files and factual metrics in `samples/web-wor
 Backend tests cover sizing, exports, stale hashes, edit invalidation, package serving,
 artifact access and full/selected ZIP integrity.
 The preview regression script checks opaque-origin HTML rendering without external CSS/JS,
-offline size-sheet controls, stalled health timeout, connection retry and mobile overflow.
+offline size-sheet controls, independent segment failures, retries only on failure,
+stalled health timeouts, script-restricted previews and mobile overflow.
 
 The live interface follows the saved editable Figma mockup. The Starter plan's MCP
 quota prevented a fresh design-context fetch, so a pixel-exact Figma comparison

@@ -1080,42 +1080,94 @@ dialog pre {
   }
 }
 
-.connection-notice {
-  margin: 0 28px 18px;
-  padding: 18px 22px;
+.connection-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  background: var(--amber-soft);
-  border: 1px solid #ead9b5;
-  border-radius: 12px;
-}
-.connection-notice p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.connection-actions {
-  display: flex;
   gap: 12px;
-  flex-shrink: 0;
-  align-items: center;
+  padding: 10px 28px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
 }
-.engine-link {
-  color: var(--brand);
+.connection-segments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+}
+.connection-segment {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+.status-light {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #bcc0cb;
+}
+.connection-segment.connected {
+  color: var(--green);
+}
+.connection-segment.connected .status-light {
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.connection-segment.failed {
+  color: var(--red);
+}
+.connection-segment.failed .status-light {
+  background: var(--red);
+  box-shadow: 0 0 0 3px #fce8ec;
+}
+.connection-segment.pending .status-light {
+  background: var(--brand);
+  animation: connection-pulse 1s ease-in-out infinite;
+}
+.connection-retry {
+  border: 0;
+  padding: 2px 4px;
+  background: transparent;
+  color: var(--red);
+  text-decoration: underline;
+  font-size: 11px;
+}
+.connection-summary {
+  color: var(--muted);
   font-weight: 600;
   white-space: nowrap;
 }
-@media (max-width: 900px) {
-  .connection-notice {
-    margin: 0 12px 12px;
-    align-items: flex-start;
-    flex-direction: column;
+.connection-summary.ready {
+  color: var(--green);
+}
+@keyframes connection-pulse {
+  50% {
+    opacity: 0.25;
   }
-  .connection-actions {
+}
+@media (prefers-reduced-motion: reduce) {
+  .connection-segment.pending .status-light {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .connection-status {
+    padding: 10px 12px;
+    align-items: flex-start;
+    font-size: 10px;
+  }
+  .connection-segments {
+    gap: 8px 12px;
+  }
+  .connection-segment {
+    gap: 5px;
     flex-wrap: wrap;
+  }
+  .connection-retry {
+    font-size: 10px;
   }
 }
 
@@ -1123,7 +1175,7 @@ dialog pre {
 
   </head>
   <body>
-    <div id="app"><header class="topbar"><div class="brand"><span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L20 8l-4-4L4 16Zm11-11 4 4"/></svg></span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg><span class="project-name">New production project</span></div><div class="right"><span class="badge warning">Engine unavailable</span><button class="quiet" data-action="new-project"  >New project</button><a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M3 12h2m14 0h2M12 3v2m0 14v2"/></svg></a><span class="avatar">R</span></div></header><nav class="stepper" aria-label="Processing workflow"><button class="step active" data-action="navigate" data-step="0" ><span class="step-number">1</span><span><strong>Input</strong><small>Current step</small></span></button><button class="step " data-action="navigate" data-step="1" disabled><span class="step-number">2</span><span><strong>Analyze</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="2" disabled><span class="step-number">3</span><span><strong>Define parts</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="3" disabled><span class="step-number">4</span><span><strong>Vectorize</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="4" disabled><span class="step-number">5</span><span><strong>Validate</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="5" disabled><span class="step-number">6</span><span><strong>Download</strong><small>Upcoming</small></span></button></nav><section class="connection-notice" role="status"><div><strong>Workspace preview · Engine not connected</strong><p>This preview displays the interface. Upload, vectorization and exports require the running ReVector server.</p><p>In your project folder, run <code>docker compose up --build</code>, then open the workspace at your server address.</p></div><div class="connection-actions"><a class="engine-link" href="http://localhost:8000/" target="_blank" rel="noopener">Open local workspace ↗</a><button class="" data-action="retry-connection"  >Retry connection</button></div></section><div class="workspace"><aside class="card sidebar stack"><h2>Project setup</h2><div class="project-form stack"><label>Project name<input name="project-name" type="text" value="Untitled jersey"  ></label><label>Vector strategy<select name="vector-mode" ><option value="color" selected>Color trace</option><option value="precision" >Precision shapes</option><option value="mono" >Single-color logo</option><option value="reconstruction" >Layer reconstruction</option></select></label></div><div class="divider"></div><h3>Vector detail</h3><div class="presets"><button class="" data-action="preset"  data-value="FAST">FAST</button><button class="selected" data-action="preset"  data-value="BALANCED">BALANCED</button><button class="" data-action="preset"  data-value="PRECISION">PRECISION</button><button class="" data-action="preset"  data-value="ULTRA">ULTRA</button></div><p class="small muted">Balanced retains graphic detail with manageable path complexity.</p><div class="settings-detail stack"><div class="divider"></div><h3>Processing</h3><label class="checkbox"><input type="checkbox" name="noise" checked >Reduce image noise</label><label class="checkbox"><input type="checkbox" name="colors" checked >Preserve source colors</label><label class="checkbox"><input type="checkbox" name="ocr"  >Detect text (OCR)</label><label class="checkbox"><input type="checkbox" name="perspective"  >Try automatic perspective</label><p class="small muted">Perspective correction records its transform. You can mark four corners manually.</p><div class="divider"></div><span class="badge warning">OpenAI · Not connected</span><p class="small muted">Core analysis and tracing work without an API key. OpenAI processing is currently unavailable.</p></div></aside><main class="main-column"><section class="card stack"><h2>Input artwork</h2><p class="muted">Upload a jersey photo or a flat artwork layout.</p><div class="dropzone" id="dropzone"><div class="upload-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4"/></svg></div><h2>Drop your artwork here</h2><p class="small muted">JPG, PNG or WEBP · up to 50 MB</p><div class="row"><button class="primary" data-action="upload" disabled >Choose file</button><button class="" data-action="sample" disabled >Try jersey sample</button><button class="quiet" data-action="sample-layout" disabled >Multi-part sample</button></div></div></section><section class="card stack"><div class="row between"><h2>Required parts & dimensions</h2><button class="quiet" data-action="add-requirement"  >+ Add part size</button></div><p class="small muted">Optional size sheet. Match these requirements to detected parts during review.</p><div class="requirements"><div class="requirement requirements-head"><span>PART</span><span>WIDTH (mm)</span><span>HEIGHT (mm)</span><span></span></div><p class="muted small">No physical sizes supplied. Exports remain uncalibrated until you enter measurements.</p></div></section></main><aside class="card inspector stack"><h2>Before you analyze</h2><p class="small muted">A clear source makes cleaner paths.</p><ul class="tips"><li>Keep every panel visible</li><li>Use a straight, well-lit photo</li><li>Include logos at full resolution</li></ul><div class="divider"></div><h3>What happens next</h3><div class="row"><span class="badge purple">01</span><span class="small">Analyze source quality</span></div><div class="row"><span class="badge purple">02</span><span class="small">Detect visible components</span></div><div class="row"><span class="badge purple">03</span><span class="small">Review boundaries & dimensions</span></div><div class="row"><span class="badge purple">04</span><span class="small">Create and validate real vectors</span></div><div class="divider"></div><h3>Physical dimensions</h3><p class="small muted">Measurements come from your size sheet or manual input. A photograph does not establish garment size.</p><span class="badge warning">Dimensions require review</span><div class="divider"></div><a class="small" href="/docs" target="_blank" rel="noopener">Engine API documentation ↗</a></aside></div><footer class="bottom-bar"><p class="small muted">Your original image is preserved.</p><div class="actions"><button class="primary" data-action="analyze" disabled >Analyze input</button></div></footer></div>
+    <div id="app"><header class="topbar"><div class="brand"><span class="brand-mark"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-1 5 5-1L20 8l-4-4L4 16Zm11-11 4 4"/></svg></span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg><span class="project-name">New production project</span></div><div class="right"><button class="quiet" data-action="new-project"  >New project</button><a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M3 12h2m14 0h2M12 3v2m0 14v2"/></svg></a><span class="avatar">R</span></div></header><section class="connection-status" aria-label="Connection status" role="status"><div class="connection-segments"><div class="connection-segment pending" data-connection="server"><span class="status-light" aria-hidden="true"></span><span>Server connecting</span></div><div class="connection-segment pending" data-connection="engine"><span class="status-light" aria-hidden="true"></span><span>Engine connecting</span></div><div class="connection-segment pending" data-connection="tool"><span class="status-light" aria-hidden="true"></span><span>Tool connecting</span></div></div><span class="connection-summary ">Connecting…</span></section><nav class="stepper" aria-label="Processing workflow"><button class="step active" data-action="navigate" data-step="0" ><span class="step-number">1</span><span><strong>Input</strong><small>Current step</small></span></button><button class="step " data-action="navigate" data-step="1" disabled><span class="step-number">2</span><span><strong>Analyze</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="2" disabled><span class="step-number">3</span><span><strong>Define parts</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="3" disabled><span class="step-number">4</span><span><strong>Vectorize</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="4" disabled><span class="step-number">5</span><span><strong>Validate</strong><small>Upcoming</small></span></button><button class="step " data-action="navigate" data-step="5" disabled><span class="step-number">6</span><span><strong>Download</strong><small>Upcoming</small></span></button></nav><div class="workspace"><aside class="card sidebar stack"><h2>Project setup</h2><div class="project-form stack"><label>Project name<input name="project-name" type="text" value="Untitled jersey"  ></label><label>Vector strategy<select name="vector-mode" ><option value="color" selected>Color trace</option><option value="precision" >Precision shapes</option><option value="mono" >Single-color logo</option><option value="reconstruction" >Layer reconstruction</option></select></label></div><div class="divider"></div><h3>Vector detail</h3><div class="presets"><button class="" data-action="preset"  data-value="FAST">FAST</button><button class="selected" data-action="preset"  data-value="BALANCED">BALANCED</button><button class="" data-action="preset"  data-value="PRECISION">PRECISION</button><button class="" data-action="preset"  data-value="ULTRA">ULTRA</button></div><p class="small muted">Balanced retains graphic detail with manageable path complexity.</p><div class="settings-detail stack"><div class="divider"></div><h3>Processing</h3><label class="checkbox"><input type="checkbox" name="noise" checked >Reduce image noise</label><label class="checkbox"><input type="checkbox" name="colors" checked >Preserve source colors</label><label class="checkbox"><input type="checkbox" name="ocr"  >Detect text (OCR)</label><label class="checkbox"><input type="checkbox" name="perspective"  >Try automatic perspective</label><p class="small muted">Perspective correction records its transform. You can mark four corners manually.</p><div class="divider"></div><span class="badge warning">OpenAI · Not connected</span><p class="small muted">Core analysis and tracing work without an API key. OpenAI processing is currently unavailable.</p></div></aside><main class="main-column"><section class="card stack"><h2>Input artwork</h2><p class="muted">Upload a jersey photo or a flat artwork layout.</p><div class="dropzone" id="dropzone"><div class="upload-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4"/></svg></div><h2>Drop your artwork here</h2><p class="small muted">JPG, PNG or WEBP · up to 50 MB</p><div class="row"><button class="primary" data-action="upload" disabled >Choose file</button><button class="" data-action="sample" disabled >Try jersey sample</button><button class="quiet" data-action="sample-layout" disabled >Multi-part sample</button></div></div></section><section class="card stack"><div class="row between"><h2>Required parts & dimensions</h2><button class="quiet" data-action="add-requirement"  >+ Add part size</button></div><p class="small muted">Optional size sheet. Match these requirements to detected parts during review.</p><div class="requirements"><div class="requirement requirements-head"><span>PART</span><span>WIDTH (mm)</span><span>HEIGHT (mm)</span><span></span></div><p class="muted small">No physical sizes supplied. Exports remain uncalibrated until you enter measurements.</p></div></section></main><aside class="card inspector stack"><h2>Before you analyze</h2><p class="small muted">A clear source makes cleaner paths.</p><ul class="tips"><li>Keep every panel visible</li><li>Use a straight, well-lit photo</li><li>Include logos at full resolution</li></ul><div class="divider"></div><h3>What happens next</h3><div class="row"><span class="badge purple">01</span><span class="small">Analyze source quality</span></div><div class="row"><span class="badge purple">02</span><span class="small">Detect visible components</span></div><div class="row"><span class="badge purple">03</span><span class="small">Review boundaries & dimensions</span></div><div class="row"><span class="badge purple">04</span><span class="small">Create and validate real vectors</span></div><div class="divider"></div><h3>Physical dimensions</h3><p class="small muted">Measurements come from your size sheet or manual input. A photograph does not establish garment size.</p><span class="badge warning">Dimensions require review</span><div class="divider"></div><a class="small" href="/docs" target="_blank" rel="noopener">Engine API documentation ↗</a></aside></div><footer class="bottom-bar"><p class="small muted">Your original image is preserved.</p><div class="actions"><button class="primary" data-action="analyze" disabled >Analyze input</button></div></footer></div>
     <input
       id="file-input"
       type="file"
@@ -1181,6 +1233,8 @@ dialog pre {
     error: null,
     health: null,
     connecting: true,
+    connections: { server: "pending", engine: "pending", tool: "pending" },
+    connectionMessage: "",
     selectedExports: /* @__PURE__ */ new Set(),
     format: "svg",
     draw: null,
@@ -1373,12 +1427,25 @@ dialog pre {
     }
     return `<footer class="bottom-bar"><p class="small muted">${title}</p><div class="actions">${state.busy ? `<span class="small muted">${escape(state.operation)}\u2026</span><button data-action="cancel">Cancel</button>` : `${state.step > 0 ? btn("Back", "back", "") : ""}${btn(cta, action, "primary", disabled)}`}</div></footer>`;
   }
-  function connectionNotice() {
-    return `<section class="connection-notice" role="status"><div><strong>Workspace preview \xB7 Engine not connected</strong><p>This preview displays the interface. Upload, vectorization and exports require the running ReVector server.</p><p>In your project folder, run <code>docker compose up --build</code>, then open the workspace at your server address.</p></div><div class="connection-actions"><a class="engine-link" href="http://localhost:8000/" target="_blank" rel="noopener">Open local workspace \u2197</a>${btn("Retry connection", "retry-connection", "")}</div></section>`;
+  function connectionStatus() {
+    const allReady = Object.values(state.connections).every(
+      (status) => status === "connected"
+    );
+    return `<section class="connection-status" aria-label="Connection status" role="status"><div class="connection-segments">${[
+      "server",
+      "engine",
+      "tool"
+    ].map((key) => {
+      const status = state.connections[key];
+      const text = status === "connected" ? `${label(key)} connected` : status === "failed" ? `${label(key)} failed` : status === "waiting" ? `${label(key)} waiting` : `${label(key)} connecting`;
+      return `<div class="connection-segment ${status}" data-connection="${key}"><span class="status-light" aria-hidden="true"></span><span>${text}</span>${status === "failed" ? btn("Retry", "retry-connection", "connection-retry", false, `data-segment="${key}" aria-label="Retry ${key} connection"`) : ""}</div>`;
+    }).join(
+      ""
+    )}</div><span class="connection-summary ${allReady ? "ready" : ""}">${allReady ? "Ready" : state.connecting ? "Connecting\u2026" : "Not ready"}</span></section>`;
   }
   function render() {
     const p = state.project, max = highestStep();
-    app.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-mark">${icon("pen")}</span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span>${icon("chevron")}<span class="project-name">${escape(p?.name || "New production project")}</span></div><div class="right">${badge(state.health ? "Engine connected" : state.connecting ? "Connecting to engine" : "Engine unavailable", state.health ? "success" : "warning")}${btn("New project", "new-project", "quiet")}<a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation">${icon("settings")}</a><span class="avatar">R</span></div></header><nav class="stepper" aria-label="Processing workflow">${stages.map((s, i) => `<button class="step ${state.step === i ? "active" : i < state.step ? "complete" : ""}" data-action="navigate" data-step="${i}" ${state.busy || i > max ? "disabled" : ""}><span class="step-number">${i < state.step ? icon("check") : i + 1}</span><span><strong>${s}</strong><small>${state.step === i ? "Current step" : i < state.step ? "Complete" : "Upcoming"}</small></span></button>`).join("")}</nav>${!state.health && !state.connecting ? connectionNotice() : ""}${state.busy ? `<div class="busy-banner" role="status"><span class="spinner"></span>${escape(state.operation || "Working")}\u2026 ${state.job ? '<span class="small">Background job \xB7 ' + escape(state.job.status) + "</span>" : ""}</div>` : ""}${state.error ? `<div class="status-error" role="alert"><strong>${escape(state.error.code)}</strong><span>${escape(state.error.message)}</span><button data-action="dismiss-error" class="quiet">Dismiss</button></div>` : ""}<div class="workspace">${state.step < 2 ? settingsPanel() : partsPanel()}${state.step === 0 ? inputMain() : state.step === 1 ? analysisMain() : state.step === 2 ? definitionMain() : state.step === 5 ? downloadsMain() : reviewMain()}${state.step < 2 ? inputInspector() : state.step === 2 ? partInspector() : state.step === 5 ? exportInspector() : validationInspector()}</div>${footer()}`;
+    app.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-mark">${icon("pen")}</span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span>${icon("chevron")}<span class="project-name">${escape(p?.name || "New production project")}</span></div><div class="right">${btn("New project", "new-project", "quiet")}<a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation">${icon("settings")}</a><span class="avatar">R</span></div></header>${connectionStatus()}<nav class="stepper" aria-label="Processing workflow">${stages.map((s, i) => `<button class="step ${state.step === i ? "active" : i < state.step ? "complete" : ""}" data-action="navigate" data-step="${i}" ${state.busy || i > max ? "disabled" : ""}><span class="step-number">${i < state.step ? icon("check") : i + 1}</span><span><strong>${s}</strong><small>${state.step === i ? "Current step" : i < state.step ? "Complete" : "Upcoming"}</small></span></button>`).join("")}</nav>${state.busy ? `<div class="busy-banner" role="status"><span class="spinner"></span>${escape(state.operation || "Working")}\u2026 ${state.job ? '<span class="small">Background job \xB7 ' + escape(state.job.status) + "</span>" : ""}</div>` : ""}${state.error ? `<div class="status-error" role="alert"><strong>${escape(state.error.code)}</strong><span>${escape(state.error.message)}</span><button data-action="dismiss-error" class="quiet">Dismiss</button></div>` : ""}<div class="workspace">${state.step < 2 ? settingsPanel() : partsPanel()}${state.step === 0 ? inputMain() : state.step === 1 ? analysisMain() : state.step === 2 ? definitionMain() : state.step === 5 ? downloadsMain() : reviewMain()}${state.step < 2 ? inputInspector() : state.step === 2 ? partInspector() : state.step === 5 ? exportInspector() : validationInspector()}</div>${footer()}`;
     bindCanvas();
     if ([3, 4].includes(state.step) && !state.busy && state.view !== "paths")
       loadVector();
@@ -1477,12 +1544,13 @@ dialog pre {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
-      path === "/health" ? 5e3 : 3e4
+      path.startsWith("/health") ? 5e3 : 3e4
     );
     let response;
+    let data;
     try {
       response = await fetch(
-        path === "/health" || path.startsWith(API + "/") ? path : API + path,
+        path.startsWith("/health") || path.startsWith(API + "/") ? path : API + path,
         {
           ...options,
           signal: options.signal || controller.signal,
@@ -1492,15 +1560,19 @@ dialog pre {
           }
         }
       );
+      data = await response.json().catch((error) => {
+        if (controller.signal.aborted) throw error;
+        return null;
+      });
     } finally {
       clearTimeout(timeout);
     }
-    const data = await response.json().catch(() => null);
     if (!response.ok) {
       const error = new Error(
         data?.error?.message || data?.detail?.[0]?.msg || data?.detail || `Request failed (${response.status})`
       );
       error.code = data?.error?.code || `HTTP_${response.status}`;
+      error.data = data;
       throw error;
     }
     return data;
@@ -2065,21 +2137,44 @@ dialog pre {
     if (boot.running) return;
     boot.running = true;
     state.connecting = true;
+    state.health = null;
+    state.connections = { server: "pending", engine: "pending", tool: "pending" };
+    state.connectionMessage = "";
     render();
     try {
       if (location.protocol === "file:" || location.origin === "null") {
-        throw new Error("A downloaded HTML preview has no engine server.");
+        throw new Error("The server could not be reached from this preview.");
       }
-      state.health = await request("/health");
-      if (state.health?.engine !== "ReVector" || state.health?.status !== "ok") {
-        throw new Error("This address is not serving ReVector Engine.");
+      const server = await request("/health");
+      if (server?.engine !== "ReVector" || server?.status !== "ok") {
+        throw new Error("ReVector server did not respond.");
       }
+      state.connections.server = "connected";
+      render();
+      let report;
+      try {
+        report = await request("/health/ready");
+      } catch (error) {
+        if (!error.data?.segments) throw error;
+        report = error.data;
+      }
+      if (report?.engine !== "ReVector" || !report.segments) {
+        throw new Error("The engine readiness check did not respond.");
+      }
+      for (const key of ["engine", "tool"]) {
+        state.connections[key] = report.segments[key]?.status === "connected" ? "connected" : "failed";
+      }
+      if (Object.values(state.connections).some((status) => status !== "connected")) {
+        state.connectionMessage = state.connections.engine === "failed" ? "Engine checks failed." : "Tool checks failed.";
+        return;
+      }
+      state.health = report;
       let saved;
       try {
         saved = localStorage.getItem("revector.project");
       } catch {
       }
-      if (saved) {
+      if (saved && !state.project) {
         try {
           state.project = { project_id: saved };
           await refresh();
@@ -2094,14 +2189,23 @@ dialog pre {
         }
       }
     } catch (error) {
-      state.health = null;
+      const failed = state.connections.server !== "connected" ? "server" : "engine";
+      state.connections[failed] = "failed";
+      if (failed === "server") {
+        state.connections.engine = "waiting";
+        state.connections.tool = "waiting";
+      } else {
+        state.connections.tool = "waiting";
+      }
+      state.connectionMessage = failed === "server" ? "Server connection failed." : "Engine connection failed.";
     } finally {
       state.connecting = false;
       boot.running = false;
+      render();
     }
-    render();
   }
-  boot();
+  if (globalThis.REVECTOR_PRERENDER) render();
+  else boot();
 })();
 
 </script>

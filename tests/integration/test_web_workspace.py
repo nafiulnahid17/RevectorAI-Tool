@@ -24,7 +24,9 @@ def test_served_workspace_and_static_assets(tmp_path):
         assert 'type="module"' not in html
         assert 'src="./workspace.js"' not in html
         assert 'href="./workspace.css"' not in html
-        assert 'Retry connection' in html
+        assert 'data-connection="server"' in html
+        assert 'data-connection="engine"' in html
+        assert 'data-connection="tool"' in html
 
 
 def test_part_measurements_in_export_and_selective_zip(engine):

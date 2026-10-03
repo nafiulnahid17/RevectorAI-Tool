@@ -199,13 +199,35 @@ function footer() {
   }
   return `<footer class="bottom-bar"><p class="small muted">${title}</p><div class="actions">${state.busy ? `<span class="small muted">${escape(state.operation)}…</span><button data-action="cancel">Cancel</button>` : `${state.step > 0 ? btn("Back", "back", "") : ""}${btn(cta, action, "primary", disabled)}`}</div></footer>`;
 }
-function connectionNotice() {
-  return `<section class="connection-notice" role="status"><div><strong>Workspace preview · Engine not connected</strong><p>This preview displays the interface. Upload, vectorization and exports require the running ReVector server.</p><p>In your project folder, run <code>docker compose up --build</code>, then open the workspace at your server address.</p></div><div class="connection-actions"><a class="engine-link" href="http://localhost:8000/" target="_blank" rel="noopener">Open local workspace ↗</a>${btn("Retry connection", "retry-connection", "")}</div></section>`;
+function connectionStatus() {
+  const allReady = Object.values(state.connections).every(
+    (status) => status === "connected",
+  );
+  return `<section class="connection-status" aria-label="Connection status" role="status"><div class="connection-segments">${[
+    "server",
+    "engine",
+    "tool",
+  ]
+    .map((key) => {
+      const status = state.connections[key];
+      const text =
+        status === "connected"
+          ? `${label(key)} connected`
+          : status === "failed"
+            ? `${label(key)} failed`
+            : status === "waiting"
+              ? `${label(key)} waiting`
+              : `${label(key)} connecting`;
+      return `<div class="connection-segment ${status}" data-connection="${key}"><span class="status-light" aria-hidden="true"></span><span>${text}</span>${status === "failed" ? btn("Retry", "retry-connection", "connection-retry", false, `data-segment="${key}" aria-label="Retry ${key} connection"`) : ""}</div>`;
+    })
+    .join(
+      "",
+    )}</div><span class="connection-summary ${allReady ? "ready" : ""}">${allReady ? "Ready" : state.connecting ? "Connecting…" : "Not ready"}</span></section>`;
 }
 function render() {
   const p = state.project,
     max = highestStep();
-  app.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-mark">${icon("pen")}</span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span>${icon("chevron")}<span class="project-name">${escape(p?.name || "New production project")}</span></div><div class="right">${badge(state.health ? "Engine connected" : state.connecting ? "Connecting to engine" : "Engine unavailable", state.health ? "success" : "warning")}${btn("New project", "new-project", "quiet")}<a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation">${icon("settings")}</a><span class="avatar">R</span></div></header><nav class="stepper" aria-label="Processing workflow">${stages.map((s, i) => `<button class="step ${state.step === i ? "active" : i < state.step ? "complete" : ""}" data-action="navigate" data-step="${i}" ${state.busy || i > max ? "disabled" : ""}><span class="step-number">${i < state.step ? icon("check") : i + 1}</span><span><strong>${s}</strong><small>${state.step === i ? "Current step" : i < state.step ? "Complete" : "Upcoming"}</small></span></button>`).join("")}</nav>${!state.health && !state.connecting ? connectionNotice() : ""}${state.busy ? `<div class="busy-banner" role="status"><span class="spinner"></span>${escape(state.operation || "Working")}… ${state.job ? '<span class="small">Background job · ' + escape(state.job.status) + "</span>" : ""}</div>` : ""}${state.error ? `<div class="status-error" role="alert"><strong>${escape(state.error.code)}</strong><span>${escape(state.error.message)}</span><button data-action="dismiss-error" class="quiet">Dismiss</button></div>` : ""}<div class="workspace">${state.step < 2 ? settingsPanel() : partsPanel()}${state.step === 0 ? inputMain() : state.step === 1 ? analysisMain() : state.step === 2 ? definitionMain() : state.step === 5 ? downloadsMain() : reviewMain()}${state.step < 2 ? inputInspector() : state.step === 2 ? partInspector() : state.step === 5 ? exportInspector() : validationInspector()}</div>${footer()}`;
+  app.innerHTML = `<header class="topbar"><div class="brand"><span class="brand-mark">${icon("pen")}</span><h1>ReVector</h1></div><div class="breadcrumb"><span class="muted small">Projects</span>${icon("chevron")}<span class="project-name">${escape(p?.name || "New production project")}</span></div><div class="right">${btn("New project", "new-project", "quiet")}<a class="icon-button muted" href="/docs" target="_blank" aria-label="API documentation">${icon("settings")}</a><span class="avatar">R</span></div></header>${connectionStatus()}<nav class="stepper" aria-label="Processing workflow">${stages.map((s, i) => `<button class="step ${state.step === i ? "active" : i < state.step ? "complete" : ""}" data-action="navigate" data-step="${i}" ${state.busy || i > max ? "disabled" : ""}><span class="step-number">${i < state.step ? icon("check") : i + 1}</span><span><strong>${s}</strong><small>${state.step === i ? "Current step" : i < state.step ? "Complete" : "Upcoming"}</small></span></button>`).join("")}</nav>${state.busy ? `<div class="busy-banner" role="status"><span class="spinner"></span>${escape(state.operation || "Working")}… ${state.job ? '<span class="small">Background job · ' + escape(state.job.status) + "</span>" : ""}</div>` : ""}${state.error ? `<div class="status-error" role="alert"><strong>${escape(state.error.code)}</strong><span>${escape(state.error.message)}</span><button data-action="dismiss-error" class="quiet">Dismiss</button></div>` : ""}<div class="workspace">${state.step < 2 ? settingsPanel() : partsPanel()}${state.step === 0 ? inputMain() : state.step === 1 ? analysisMain() : state.step === 2 ? definitionMain() : state.step === 5 ? downloadsMain() : reviewMain()}${state.step < 2 ? inputInspector() : state.step === 2 ? partInspector() : state.step === 5 ? exportInspector() : validationInspector()}</div>${footer()}`;
   bindCanvas();
   if ([3, 4].includes(state.step) && !state.busy && state.view !== "paths")
     loadVector();

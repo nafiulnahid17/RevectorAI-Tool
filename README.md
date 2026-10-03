@@ -80,6 +80,14 @@ curl http://127.0.0.1:8000/health
 
 Docker runs as a non-root user with persistent local storage and one API process.
 See [architecture](docs/ARCHITECTURE.md) for the local queue's deployment limits.
+
+## Railway
+
+Deploy this repository as a Railway Docker service, attach a persistent volume at
+`/engine/data`, and generate a public domain after `/health/ready` passes. The image
+honors Railway's `PORT` and serves the interface and API together. The frontend
+shows Server / Engine / Tool lights and Ready; Retry appears only for failed checks.
+Follow [Railway deployment](docs/RAILWAY.md) for exact variables and verification.
 The engine should be private behind JerseyOS authentication; it deliberately
 does not implement host billing or user authentication.
 

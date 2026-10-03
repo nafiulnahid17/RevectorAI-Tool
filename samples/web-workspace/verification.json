@@ -1,5 +1,5 @@
 {
-  "project_id": "75da77a7-686c-45cf-a327-7c1396f96700",
+  "project_id": "144a8346-1af5-488e-ba89-e7771632e5d8",
   "detected_parts": 2,
   "validation": {
     "valid_svg": true,
@@ -35,7 +35,7 @@
     "gradients": 0,
     "patterns": 0,
     "anchor_points": 2609,
-    "validated_sha256": "695998b4c744925626538f80185b5a10d11d122eef7a3ad9bebd06b27b453d2a",
+    "validated_sha256": "7c031cda3d0688db23790f799ea096ac915bf289d728204d89748e01b21b1457",
     "render_succeeded": true,
     "visual_comparison": {
       "ssim": 0.8933688718983066,
@@ -48,24 +48,24 @@
     },
     "parts": [
       {
-        "part_id": "part_5ff314865ec449db",
+        "part_id": "part_2910f425641842f6",
         "part": "front_body",
         "paths": 61,
         "anchors": 1318,
         "rasters": 0,
         "status": "PASS",
-        "validated_sha256": "9cd148b0932700777d13507de5e900ad0bd654419abbb9eed5982e81aab0603b",
+        "validated_sha256": "4fd01c3de8d3ff174679169e27a1755a6a0ffb4cd48000a4fbd4adb1af30fdc6",
         "physical_width_mm": 520,
         "physical_height_mm": 421.4
       },
       {
-        "part_id": "part_bd2268bd22044dae",
+        "part_id": "part_fc4bacb3032d4eeb",
         "part": "back_body",
         "paths": 61,
         "anchors": 1291,
         "rasters": 0,
         "status": "PASS",
-        "validated_sha256": "31fc9b25ae6e84dc1631536c21505e9a9d693abf9bc7922b14f948c5e836e6bc",
+        "validated_sha256": "283fb6f77846bd264acca0a6187b6665dadf448bd3518bcca226b60bc8b43d0e",
         "physical_width_mm": 540,
         "physical_height_mm": 437.6
       }

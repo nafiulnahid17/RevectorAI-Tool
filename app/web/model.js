@@ -35,6 +35,8 @@ const state = {
   error: null,
   health: null,
   connecting: true,
+  connections: { server: "pending", engine: "pending", tool: "pending" },
+  connectionMessage: "",
   selectedExports: new Set(),
   format: "svg",
   draw: null,

@@ -23,12 +23,15 @@ async function request(path, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
-    path === "/health" ? 5000 : 30000,
+    path.startsWith("/health") ? 5000 : 30000,
   );
   let response;
+  let data;
   try {
     response = await fetch(
-      path === "/health" || path.startsWith(API + "/") ? path : API + path,
+      path.startsWith("/health") || path.startsWith(API + "/")
+        ? path
+        : API + path,
       {
         ...options,
         signal: options.signal || controller.signal,
@@ -40,10 +43,13 @@ async function request(path, options = {}) {
         },
       },
     );
+    data = await response.json().catch((error) => {
+      if (controller.signal.aborted) throw error;
+      return null;
+    });
   } finally {
     clearTimeout(timeout);
   }
-  const data = await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(
       data?.error?.message ||
@@ -52,6 +58,7 @@ async function request(path, options = {}) {
         `Request failed (${response.status})`,
     );
     error.code = data?.error?.code || `HTTP_${response.status}`;
+    error.data = data;
     throw error;
   }
   return data;
