@@ -41,6 +41,14 @@ function collectRequirements() {
 async function upload(file) {
   if (!file) return;
   await perform(async () => {
+    if (!state.health) {
+      throw Object.assign(
+        new Error(
+          "Open the workspace at your running ReVector server to process artwork.",
+        ),
+        { code: "ENGINE_UNAVAILABLE" },
+      );
+    }
     state.operation = "Uploading source";
     const config = state.project?.settings || {
       preset: state.preset,
@@ -404,7 +412,9 @@ async function handle(action, target) {
       state.requirements = [];
       state.selectionInitialized = false;
       state.selectedExports.clear();
-      localStorage.removeItem("revector.project");
+      try {
+        localStorage.removeItem("revector.project");
+      } catch {}
       render();
       break;
     case "cancel":

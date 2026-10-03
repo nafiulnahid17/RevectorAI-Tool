@@ -20,18 +20,29 @@ import {
 } from "./model.js";
 import { render } from "./views.js";
 async function request(path, options = {}) {
-  const response = await fetch(
-    path === "/health" || path.startsWith(API + "/") ? path : API + path,
-    {
-      ...options,
-      headers: {
-        ...(options.body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...options.headers,
-      },
-    },
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    path === "/health" ? 5000 : 30000,
   );
+  let response;
+  try {
+    response = await fetch(
+      path === "/health" || path.startsWith(API + "/") ? path : API + path,
+      {
+        ...options,
+        signal: options.signal || controller.signal,
+        headers: {
+          ...(!options.body || options.body instanceof FormData
+            ? {}
+            : { "Content-Type": "application/json" }),
+          ...options.headers,
+        },
+      },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(
@@ -61,7 +72,11 @@ async function refresh() {
   for (const id of ids)
     if (!state.selectionInitialized) state.selectedExports.add(id);
   if (ids.size) state.selectionInitialized = true;
-  localStorage.setItem("revector.project", state.project.project_id);
+  try {
+    localStorage.setItem("revector.project", state.project.project_id);
+  } catch {
+    // Sandboxed previews may block storage; the current project still works.
+  }
 }
 async function stage(name, params = {}) {
   if (state.cancel)

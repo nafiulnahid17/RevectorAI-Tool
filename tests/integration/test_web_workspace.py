@@ -18,6 +18,13 @@ def test_served_workspace_and_static_assets(tmp_path):
         assert client.get('/workspace.js').headers['content-type'].startswith('text/javascript')
         assert client.get('/assets/sample-panel.png').content.startswith(b'\x89PNG')
         assert client.get('/health').json()['ai_required'] is False
+        # HTML attachment previews cannot resolve root CSS paths or module imports.
+        html = client.get('/').text
+        assert '<style>' in html and '<script>' in html
+        assert 'type="module"' not in html
+        assert 'src="./workspace.js"' not in html
+        assert 'href="./workspace.css"' not in html
+        assert 'Retry connection' in html
 
 
 def test_part_measurements_in_export_and_selective_zip(engine):

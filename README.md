@@ -31,6 +31,12 @@ Open **http://127.0.0.1:8000/** for the web tool. API documentation is at `/docs
 The web interface is included in the Python package and Docker image: no Node
 build step, separate frontend server or CORS configuration is required.
 
+Opening `app/web/index.html` directly or in an attachment preview displays the
+workspace interface. Actual processing requires opening the page from the running
+engine address above. Offline previews show connection guidance instead of waiting
+indefinitely. See the web integration notes for rebuilding the bundled HTML after
+editing frontend sources.
+
 ## Browser workflow
 
 1. Upload raster artwork, or try the bundled jersey/multiple-panel samples.

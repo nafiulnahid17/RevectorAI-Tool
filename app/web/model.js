@@ -34,6 +34,7 @@ const state = {
   operation: "",
   error: null,
   health: null,
+  connecting: true,
   selectedExports: new Set(),
   format: "svg",
   draw: null,

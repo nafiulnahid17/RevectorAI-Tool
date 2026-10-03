@@ -5,6 +5,35 @@ Its relative `/api/revector` URLs use the same host as the engine. Every process
 button submits a real job and polls its persisted status. Errors retain machine
 codes. No fixture vectors or invented results are substituted for uploaded artwork.
 
+## HTML previews and connection recovery
+
+The shipped `app/web/index.html` contains its CSS, bundled JavaScript and favicon.
+It can display the workspace inside an HTML attachment preview or from `file://`
+without resolving module imports or root asset URLs. It displays the initial
+interface even when a preview blocks scripts, using markup generated from the
+same UI sources. Interactive controls require JavaScript. With scripts enabled,
+the browser renders the interface before attempting health checks. A failed or stalled check stops after
+five seconds, displays the engine connection instructions, and offers retry.
+Uploads and processing require the real engine and remain disabled while offline.
+An HTML attachment is a visual workspace preview, not a deployed Python server.
+
+To process artwork, open `http://localhost:8000/` on the machine running the engine
+(or the configured server URL). The preview cannot reach a server just because it
+is running on a separate cloud machine. Sandboxed storage failures do not prevent
+the interface from rendering or processing when the engine is reachable.
+
+Modular UI sources remain editable. After changing `app/web/*.js`,
+`workspace.css` or `workspace.template.html`, regenerate the committed HTML:
+
+```bash
+python scripts/build-workspace.py
+```
+
+This development-only build invokes pinned `esbuild@0.25.12` through `npx`.
+It requires Node/npm and downloads the build tool on first use. An installed
+executable can be passed with `--esbuild /path/to/esbuild`. Running the packaged
+engine or Docker image does not require Node or rebuilding the UI.
+
 ## Measurements and vectors
 
 Project creation accepts optional `production_specifications` entries:
@@ -60,6 +89,7 @@ server running, install Playwright in your development environment and run:
 ```bash
 npm install --no-save playwright
 CHROMIUM_PATH=/usr/bin/chromium node scripts/browser-smoke.cjs
+CHROMIUM_PATH=/usr/bin/chromium node scripts/browser-preview-smoke.cjs
 ```
 
 The script uploads a two-panel raster, analyzes and segments it, confirms dimensions,
@@ -68,6 +98,8 @@ SVG/PDF and selected/full ZIPs, and checks mobile overflow and browser errors. I
 saves screenshots, real downloaded files and factual metrics in `samples/web-workspace`.
 Backend tests cover sizing, exports, stale hashes, edit invalidation, package serving,
 artifact access and full/selected ZIP integrity.
+The preview regression script checks opaque-origin HTML rendering without external CSS/JS,
+offline size-sheet controls, stalled health timeout, connection retry and mobile overflow.
 
 The live interface follows the saved editable Figma mockup. The Starter plan's MCP
 quota prevented a fresh design-context fetch, so a pixel-exact Figma comparison

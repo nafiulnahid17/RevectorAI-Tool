@@ -25,6 +25,10 @@ app.addEventListener("click", (event) => {
   const target = event.target.closest("[data-action]");
   if (target) {
     event.preventDefault();
+    if (target.dataset.action === "retry-connection") {
+      boot();
+      return;
+    }
     handle(target.dataset.action, target).catch((error) => {
       state.error = {
         code: error.code || "INPUT_ERROR",
@@ -121,9 +125,22 @@ document
     document.querySelector("#report-dialog").close(),
   );
 async function boot() {
+  if (boot.running) return;
+  boot.running = true;
+  state.connecting = true;
+  render();
   try {
+    if (location.protocol === "file:" || location.origin === "null") {
+      throw new Error("A downloaded HTML preview has no engine server.");
+    }
     state.health = await request("/health");
-    const saved = localStorage.getItem("revector.project");
+    if (state.health?.engine !== "ReVector" || state.health?.status !== "ok") {
+      throw new Error("This address is not serving ReVector Engine.");
+    }
+    let saved;
+    try {
+      saved = localStorage.getItem("revector.project");
+    } catch {}
     if (saved) {
       try {
         state.project = { project_id: saved };
@@ -132,15 +149,16 @@ async function boot() {
         state.step = highestStep();
       } catch {
         state.project = null;
-        localStorage.removeItem("revector.project");
+        try {
+          localStorage.removeItem("revector.project");
+        } catch {}
       }
     }
   } catch (error) {
-    state.error = {
-      code: "ENGINE_UNAVAILABLE",
-      message:
-        "Could not connect to the engine. Start the server and reload this page.",
-    };
+    state.health = null;
+  } finally {
+    state.connecting = false;
+    boot.running = false;
   }
   render();
 }
