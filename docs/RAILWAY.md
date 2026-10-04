@@ -70,5 +70,39 @@ curl -f http://localhost:8000/health/ready
 ```
 
 Compose grants only CHOWN, SETUID and SETGID for volume initialization; the API runs
-non-root. Optional BuildKit secret `proxy_ca` supports managed TLS-proxy networks;
-ordinary Railway builds use normal certificate verification.
+non-root. Railway uses the plain root Dockerfile with normal certificate
+verification, without custom secret mounts or an external Dockerfile frontend.
+
+If your local development environment routes HTTPS through a managed TLS proxy,
+use the helper with that environment's combined CA bundle:
+
+```bash
+python scripts/build_local_image.py --proxy-ca /etc/ssl/certs/ca-certificates.crt \
+  --tag revector-engine:local
+```
+
+The helper generates a temporary Dockerfile, mounts the CA only for pip, keeps TLS
+verification enabled and leaves the production Dockerfile unchanged. Do not add
+local proxy CA mounts to Railway's production Dockerfile.
+
+## If a deployment fails
+
+Railway's Metal Dockerfile validator supports only `type=cache` RUN mounts.
+A production `--mount=type=secret,id=proxy_ca,...` fails before build execution
+with “other mount types are not supported”. The production Dockerfile therefore
+uses plain RUN instructions; the CA helper is only for local managed environments.
+
+A failure in **Build image / Dockerfile validation** happens before API startup.
+Open **View logs** and inspect the first error; runtime API keys and health checks
+cannot repair a Dockerfile validation failure. Ensure Source root is `/`, builder
+is Dockerfile, and any `RAILWAY_DOCKERFILE_PATH` override points to `Dockerfile`.
+Deploy the latest GitHub commit and use its own logs, not a previous failed build.
+
+If the image builds but **Deploy / Healthcheck** fails, confirm the persistent
+volume mount `/engine/data`, `REVECTOR_API_KEY` (32+ characters) and
+`REVECTOR_ALLOW_UNAUTHENTICATED=false`. Do not enter the API key in screenshots or
+paste it in build logs. Keep the start-command override empty: the packaged
+launcher handles the Railway port and mounted-volume permissions.
+
+After deployment passes, go to **Settings → Networking → Generate Domain**.
+An unexposed service has no public HTTPS address for the Cloudflare gateway.

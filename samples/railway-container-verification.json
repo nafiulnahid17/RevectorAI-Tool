@@ -1,0 +1,58 @@
+{
+  "target": "Local deployment container; not a Railway live deployment",
+  "production_dockerfile_validation": "PASS (docker build --check, no warnings)",
+  "image_build": "PASS (ephemeral local proxy CA mount only)",
+  "port": 8094,
+  "readiness": {
+    "status": "ready",
+    "engine": "ReVector",
+    "segments": {
+      "server": {
+        "status": "connected"
+      },
+      "engine": {
+        "status": "connected",
+        "checks": {
+          "engine_initialized": true,
+          "opencv": true,
+          "renderer": true,
+          "vector_validator": true,
+          "vector_render": true
+        }
+      },
+      "tool": {
+        "status": "connected",
+        "checks": {
+          "storage": true,
+          "gateway_auth": true,
+          "queue": true,
+          "vector_conversion": true
+        }
+      }
+    },
+    "dependencies": {
+      "opencv": true,
+      "vtracer": true,
+      "potrace": true,
+      "inkscape": true,
+      "resvg": true,
+      "tesseract": true
+    },
+    "ai_required": false
+  },
+  "runtime_uid": 10001,
+  "unauthenticated_api_status": 401,
+  "cross_owner_status": 404,
+  "detected_parts": 2,
+  "paths": 118,
+  "groups": 22,
+  "anchors": 2216,
+  "rasters": 0,
+  "render_succeeded": true,
+  "exports_bytes": {
+    "svg": 90755,
+    "pdf": 33048,
+    "eps": 93615,
+    "zip": 277391
+  }
+}

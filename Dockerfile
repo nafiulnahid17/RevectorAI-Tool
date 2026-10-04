@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 INKSCAPE_PROFILE_DIR=/tmp/revector-inkscape
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -7,9 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /engine
 COPY pyproject.toml requirements.txt ./
 COPY app ./app
-RUN --mount=type=secret,id=proxy_ca,required=false \
-    if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
-    pip install --no-cache-dir '.[trace,r2]' && useradd --create-home --uid 10001 revector \
+RUN python -m pip install --no-cache-dir '.[trace,r2]' && useradd --create-home --uid 10001 revector \
     && mkdir /engine/data && chown -R revector:revector /engine/data \
     && chmod -R a+rX /engine/app
 # The launcher initializes the mounted volume then drops to UID 10001 before
