@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from app.models.project import ProcessingSettings
-from app.pipeline.colors import quantize
+from app.pipeline.colors import quantize, PALETTE_VERSION
 
 
 def reconstruct(image: Image.Image, settings: ProcessingSettings):
@@ -16,5 +16,5 @@ def reconstruct(image: Image.Image, settings: ProcessingSettings):
         "operations": ["mask_background_removal"] + (["bilateral_denoise_sigma12"] if settings.noise_reduction else []),
         "shadow_reconstruction": "not_applied", "glare_reconstruction": "not_applied",
         "color_normalization": "preserved", "reference_dimensions": list(reference.size),
-        "quantization": {"max_colors": settings.max_colors, "delta_e_cie76": settings.delta_e},
+        "quantization": {"algorithm": PALETTE_VERSION, "max_colors": settings.max_colors, "delta_e_cie76": settings.delta_e},
     }

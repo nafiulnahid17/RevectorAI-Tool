@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Literal
 from uuid import uuid4
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, computed_field
 from app import __version__
+from app.ai.contracts import PartSlot, SLOTS
 
 
 def now() -> str:
@@ -12,6 +13,7 @@ def now() -> str:
 
 
 class State(StrEnum):
+    PART_REVIEW_READY = "PART_REVIEW_READY"
     CREATED = "CREATED"
     UPLOADED = "UPLOADED"
     ANALYZING = "ANALYZING"
@@ -35,7 +37,7 @@ class State(StrEnum):
 
 PartType = Literal["front_body", "back_body", "left_sleeve", "right_sleeve", "left_shoulder",
                    "right_shoulder", "front_collar", "back_collar", "left_cuff", "right_cuff",
-                   "trim", "other_part", "unknown"]
+                   "trim", "top_trim", "bottom_trim", "other_part", "unknown"]
 
 
 class ProcessingSettings(BaseModel):
@@ -53,6 +55,9 @@ class ProcessingSettings(BaseModel):
     gradients: bool = True
     allow_contour_fallback: bool = True
     max_trace_dimension: int | None = Field(None, ge=64, le=12000)
+    mockup_width: int = Field(1536, ge=1024, le=1920, multiple_of=16)
+    mockup_height: int = Field(1024, ge=768, le=1920, multiple_of=16)
+    ai_workflow: bool = True
     # No automatic raster embedding. Hybrid reconstruction still creates vectors.
     export_mode: Literal["true_vector", "hybrid"] = "true_vector"
     known_width_mm: float | None = Field(None, gt=0)
@@ -78,6 +83,12 @@ class Part(BaseModel):
     confirmed: bool = False
     locked: bool = False
     confidence: float | None = None
+    ai_confidence: float | None = Field(None,ge=0,le=1)
+    source: Literal["ai_detected","engine_refined","manual","ai_reconstructed"] = "engine_refined"
+    processing_state: str = "DETECTED"
+    error: dict | None = None
+    validation: dict | None = None
+    previews: dict[str,str] = Field(default_factory=dict)
     clean_reference: str | None = None
     vectorization_source: str | None = None
     palette: list[dict] = Field(default_factory=list)
@@ -92,6 +103,16 @@ class Part(BaseModel):
     bleed_mm: float = Field(0, ge=0, le=100)
     safe_zone_mm: float = Field(0, ge=0, le=100)
     exports: dict[str, str] = Field(default_factory=dict)
+
+    @computed_field
+    @property
+    def engine_bbox(self) -> tuple[int,int,int,int]:
+        return self.bbox
+
+    @computed_field
+    @property
+    def engine_polygon(self) -> list[tuple[float,float]] | None:
+        return self.polygon
 
     @model_validator(mode="after")
     def part_dimensions(self):
@@ -127,6 +148,12 @@ class Project(BaseModel):
     analysis: dict = Field(default_factory=dict)
     geometry: dict = Field(default_factory=dict)
     parts: list[Part] = Field(default_factory=list)
+    slots: dict[str, PartSlot] = Field(default_factory=lambda: {name:PartSlot(part_type=name) for name in SLOTS})
+    ai_assets: dict[str,str] = Field(default_factory=dict)
+    ai_metadata: dict = Field(default_factory=dict)
+    events: list[dict] = Field(default_factory=list)
+    error_history: list[dict] = Field(default_factory=list)
+    assistant_sessions: dict = Field(default_factory=dict)
     production_specifications: list[PartRequirement] = Field(default_factory=list, max_length=100)
     manual_changes: list[dict] = Field(default_factory=list)
     palette: list[dict] = Field(default_factory=list)

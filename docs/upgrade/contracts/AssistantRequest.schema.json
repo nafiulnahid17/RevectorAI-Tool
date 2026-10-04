@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "ErrorContext": {
+      "additionalProperties": false,
+      "properties": {
+        "error_code": {
+          "default": "UNKNOWN_ERROR",
+          "maxLength": 100,
+          "pattern": "^[A-Z0-9_]+$",
+          "title": "Error Code",
+          "type": "string"
+        },
+        "message": {
+          "default": "Unknown error",
+          "maxLength": 2000,
+          "title": "Message",
+          "type": "string"
+        },
+        "phase": {
+          "default": "request",
+          "maxLength": 80,
+          "title": "Phase",
+          "type": "string"
+        },
+        "part_id": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part Id"
+        },
+        "retryable": {
+          "default": true,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "title": "ErrorContext",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "error_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Id"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ErrorContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "question": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Question",
+      "type": "string"
+    }
+  },
+  "title": "AssistantRequest",
+  "type": "object"
+}

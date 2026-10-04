@@ -79,3 +79,10 @@ def test_non_useful_geometry_never_true_vector(shape):
 @pytest.mark.parametrize("d", ["M0 0L1 2 3", "M0 0Z 2 3", "M0 0A-1 2 0 0 1 10 10", "M0 0A1 2 0 2 1 10 10"])
 def test_invalid_command_arity_and_arc_flags(d):
     assert not validate_svg(ROOT.format(f'<path d="{d}"/>'))["valid_svg"]
+
+@pytest.mark.parametrize('d',['M0 0 L0 0','M1 1 C1 1 1 1 1 1'])
+def test_degenerate_path_cannot_hide_beside_real_artwork(d):
+    svg=f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0 L10 0 L10 10 Z"/><path d="{d}"/></svg>'
+    report=validate_svg(svg)
+    assert not report['true_vector'] and report['degenerate_object_count']==1
+    assert 'Invalid path geometry' in report['errors']

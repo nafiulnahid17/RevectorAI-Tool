@@ -1,0 +1,12 @@
+{
+  "analysis": "Current assistant visual analysis; exact model identifier not exposed",
+  "image_generation": "Built-in image_gen tool; exact model identifier and model selector not exposed",
+  "model_switch_requested": true,
+  "model_switch_status": "UNAVAILABLE",
+  "live_provider_api_calls": 0,
+  "fallback_test_plan": [
+    "Prompt retry if reconstruction fails review",
+    "Real deterministic contour fallback",
+    "Mocked primary-to-fallback routing regression, distinct from live model switching"
+  ]
+}

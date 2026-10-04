@@ -17,6 +17,7 @@ from app.models.project import Project, Part, ProcessingSettings, State, now
 from app.storage.local import LocalStorage
 from app.pipeline import ingest, quality, geometry, segmentation, reconstruction, decomposition, vectorization
 from app.pipeline import export as exporter
+from app.pipeline import colors
 from app.providers.ocr import TesseractOCR
 from app.vector.simplify import optimize
 from app.vector.svg_composer import compose, diagnostic
@@ -42,8 +43,13 @@ def digest(value) -> str:
 
 class Engine:
     def __init__(self, settings: Settings, *, vision_provider=None, reconstruction_provider=None,
-                 segmentation_provider=None, ocr_provider=None):
+                 segmentation_provider=None, ocr_provider=None, ai_router=None, error_ai_router=None):
         self.settings = settings
+        from app.ai.router import AIRouter
+        from app.pipeline.workflow import ProductionWorkflow
+        self.ai_router = ai_router or AIRouter()
+        self.error_ai_router = error_ai_router or AIRouter(error_mode=True)
+        self.workflow = ProductionWorkflow(self)
         if settings.storage_backend != "local":
             raise EngineError("NOT_IMPLEMENTED", "Automatic R2 project orchestration is not implemented; use the explicit R2Storage adapter")
         self.storage = LocalStorage(settings.data_dir)
@@ -60,7 +66,9 @@ class Engine:
         return project
 
     def load(self, project_id: str) -> Project:
-        return self.storage.load(project_id)
+        p=self.storage.load(project_id)
+        p.exports={k:v for k,v in p.exports.items() if k.startswith('selected_zip_')} if p.stage_metadata.get('export_policy')=='parts_only_v1' else {}
+        return p
 
     def key(self, project: Project, suffix: str) -> str:
         return f"projects/{project.project_id}/{suffix}"
@@ -82,6 +90,11 @@ class Engine:
         with self.storage.lock(project_id):
             p = self.load(project_id)
             self.invalidate(p, "analyze")
+            p.ai_assets, p.ai_metadata = {}, {}
+            from app.ai.contracts import SLOTS, PartSlot
+            p.slots = {name:PartSlot(part_type=name) for name in SLOTS}
+            p.events, p.error_history, p.assistant_sessions = [], [], {}
+            p.events.append({'event':'UPLOAD_RECEIVED','timestamp':now()})
             p.source_hash, p.source_metadata = meta["sha256"], meta
             suffix = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}[meta["format"]]
             p.source_file = self.key(p, f"source/{p.source_hash}.{suffix}")
@@ -108,6 +121,9 @@ class Engine:
             p.geometry, p.corrected_image = {}, None
         if index <= 2:
             p.parts = []
+            from app.ai.contracts import SLOTS, PartSlot
+            p.slots={name:PartSlot(part_type=name) for name in SLOTS}
+            p.ai_metadata.pop('review',None)
         for part in p.parts:
             if affected is not None and part.part_id not in affected:
                 continue
@@ -120,6 +136,9 @@ class Engine:
             if index <= 4:
                 part.vector, part.metrics = None, {}
         p.master_svg, p.validation, p.previews, p.exports = None, None, {}, {}
+        for part in p.parts:
+            part.validation = None
+            part.previews = {}
         for part in p.parts:
             part.exports = {}
         p.error = None
@@ -134,7 +153,7 @@ class Engine:
                 raise EngineError("INVALID_SETTINGS", "Processing settings are invalid or physical geometry lacks calibration") from exc
             changed = {k for k, v in updated.model_dump().items() if old[k] != v}
             if changed:
-                if changed & {"segment_min_area_ratio"}:
+                if changed & {"segment_min_area_ratio","mockup_width","mockup_height","ai_workflow"}:
                     stage = "segment"
                 elif changed & {"max_colors", "delta_e", "noise_reduction", "preserve_original_colors", "ocr", "text_mode"}:
                     stage = "reconstruct"
@@ -159,6 +178,8 @@ class Engine:
     def run(self, project_id: str, stage: str, params: dict | None = None, *, job_id: str | None = None,
             cancelled=lambda: False) -> dict:
         params = params or {}
+        if stage in {'prepare','production','recover-part','ai-missing'}:
+            return self.workflow.run(project_id,stage,params,job_id,cancelled)
         if stage not in [*STAGES, "export"]:
             raise EngineError("NOT_IMPLEMENTED", "Unknown processing stage")
         with self.storage.lock(project_id):
@@ -192,8 +213,13 @@ class Engine:
                 error = exc if isinstance(exc, EngineError) else EngineError("PROCESSING_FAILED", "Unexpected processing failure; see server logs", False, 500)
                 if not isinstance(exc, EngineError):
                     import logging
-                    logging.getLogger("revector").exception("stage failed project=%s stage=%s", project_id, stage)
+                    logging.getLogger("revector").error("unexpected_stage_failure project=%s stage=%s", project_id, stage)
+                from app.errors.normalization import normalize
+                from app.errors.service import credentials
+                error.normalized = normalize(error.code,error.message,error.recoverable,phase=stage,project_id=project_id,job_id=job_id,part_id=params.get('part_id'),secrets=credentials(self))
                 p.error = error.as_dict()
+                p.error_history.append(p.error)
+                p.error_history = p.error_history[-50:]
                 # Export failures preserve validated, usable SVG and any successful formats.
                 integrity_failure = error.code in {"STALE_VALIDATION", "SVG_VALIDATION_FAILED", "RASTER_FOUND_IN_TRUE_VECTOR", "SVG_RENDER_FAILED"}
                 p.state = previous_state if stage == "export" and not integrity_failure else State.FAILED
@@ -229,10 +255,11 @@ class Engine:
 
     def stage_correct_geometry(self, p, params, cancelled):
         self.require(bool(p.analysis), "Analyze the source first")
-        signature = digest([self.file_hash(p.working_image), params])
+        source_key=p.ai_assets.get("mockup") or p.working_image
+        signature = digest([self.file_hash(source_key), params])
         if self._cached(p, "correct-geometry", signature):
             return {"cached": True, "geometry": p.geometry}
-        image, meta = geometry.correct(self.image(p.working_image), params.get("corners"), params.get("auto", False))
+        image, meta = geometry.correct(self.image(source_key), params.get("corners"), params.get("auto", False))
         self.invalidate(p, "correct-geometry")
         p.corrected_image = self.put_image(self.key(p, "working/corrected.png"), image)
         p.geometry = meta
@@ -312,7 +339,7 @@ class Engine:
         for part in self.selected(p, params):
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Reconstruction cancelled")
-            signature = digest([self.file_hash(part.corrected_crop), p.settings.max_colors, p.settings.delta_e,
+            signature = digest([colors.PALETTE_VERSION, self.file_hash(part.corrected_crop), p.settings.max_colors, p.settings.delta_e,
                                 p.settings.noise_reduction, p.settings.ocr])
             if part.cache.get("reconstruct") == signature and part.clean_reference and part.vectorization_source:
                 results[part.part_id] = {"cached": True}
@@ -354,16 +381,17 @@ class Engine:
                 raise EngineError("JOB_CANCELLED", "Vectorization cancelled")
             signature = digest([self.file_hash(part.clean_reference), self.file_hash(part.vectorization_source),
                                 p.settings.preset, p.settings.vector_mode, p.settings.min_region_area,
-                                p.settings.gradients, p.settings.max_trace_dimension, p.settings.allow_contour_fallback])
+                                p.settings.gradients, p.settings.max_trace_dimension, p.settings.allow_contour_fallback, params.get("fallback_trace",False)])
             if part.cache.get("vectorize") == signature and part.vector and self.storage.exists(part.vector):
                 results[part.part_id] = {"cached": True}
                 continue
+            trace_settings = p.settings.model_copy(update={'vector_mode':'precision','gradients':False}) if params.get('fallback_trace') else p.settings
             root, meta = vectorization.vectorize(self.image(part.clean_reference), self.image(part.vectorization_source),
-                                                 p.settings, self.settings.tool_timeout_seconds)
+                                                 trace_settings, self.settings.tool_timeout_seconds)
             data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
             check = validate_svg(data, max_bytes=self.settings.max_svg_bytes, max_pixels=self.settings.max_pixels)
             if not check["true_vector"]:
-                raise EngineError("VECTOR_TRACE_FAILED", "Trace failed integrity checks: " + "; ".join(check["errors"][:3]))
+                raise EngineError("VECTOR_TRACE_FAILED", "Trace failed integrity checks: " + "; ".join(check["errors"][:3]),diagnostics={'validation_errors':check['errors'],'trace_engine':meta.get('backend'),'fallback_attempted':meta.get('fallback_attempted',False)})
             if check["path_count"] > self.settings.max_paths:
                 raise EngineError("VECTOR_COMPLEXITY_LIMIT", "Trace exceeds configured path limit; simplify settings or explicitly increase the limit")
             self.invalidate(p, "vectorize", {part.part_id})
@@ -395,7 +423,7 @@ class Engine:
             existing_ids = {element.get("id") for element in root.iter() if element.get("id")}
             for index, element in enumerate(root.iter()):
                 if element.tag.split("}")[-1] in {"path", "rect", "circle", "ellipse", "polygon", "polyline", "line"} and not element.get("id"):
-                    shape_id = f"shape_{index:06d}"
+                    shape_id = 'shape_' + digest([element.tag,element.attrib])[:16]
                     while shape_id in existing_ids:
                         shape_id += "_"
                     element.set("id", shape_id)
@@ -417,7 +445,7 @@ class Engine:
     def stage_compose(self, p, params, cancelled):
         self.require(bool(p.parts) and all(part.vector and part.cache.get("optimize") for part in p.parts),
                      "Optimize every current part before composing")
-        signature = digest([[part.model_dump(exclude={"cache", "warnings", "metrics"}), self.file_hash(part.vector)]
+        signature = digest([[part.model_dump(exclude={"cache", "warnings", "metrics", "validation", "previews", "processing_state", "error"}), self.file_hash(part.vector)]
                             for part in p.parts] + [p.settings.known_width_mm, p.settings.bleed_mm, p.settings.safe_zone_mm])
         if self._cached(p, "compose", signature):
             return {"cached": True}
@@ -467,6 +495,11 @@ class Engine:
                 raise EngineError("SVG_VALIDATION_FAILED", "A composed part did not pass True Vector validation")
             part_render = render_svg(part_data, part.bbox[2], part.bbox[3])
             part_diff, _ = compare(self.image(part.clean_reference), part_render)
+            part.validation = {**part_report,"render_succeeded":True,"validated_sha256":hashlib.sha256(part_data).hexdigest()}
+            diagnostic_data, diagnostic_nodes = diagnostic(part_data)
+            diagnostic_key = self.key(p,f'previews/{part.part_id}-paths.svg')
+            self.storage.put(diagnostic_key,diagnostic_data)
+            part.previews['vector_view']=diagnostic_key
             part.metrics["visual_difference"] = part_diff
             report["parts"].append({"part_id": part.part_id, "part": part.type, "paths": part_report["path_count"],
                                     "anchors": part_report["total_anchor_count"], "rasters": part_report["embedded_rasters"], "status": "PASS",
@@ -482,6 +515,7 @@ class Engine:
         nodes_key = self.key(p, "reports/nodes.json")
         self.storage.json(nodes_key, nodes)
         p.previews["nodes"] = nodes_key
+        report.update(status="PASS",vector_status=report["status"],vector_paths=report["path_count"],editable_objects=report["shape_count"],geometry_integrity="PASS")
         report["file_size_bytes"] = len(data)
         p.state = State.VALIDATED
         self.storage.save(p)
@@ -511,10 +545,12 @@ class Engine:
             if selected_ids:
                 raise EngineError("INVALID_EXPORT_SELECTION", "Use part_id or part_ids, not both")
             selected_ids = [params["part_id"]]
-        chosen = [part for part in p.parts if selected_ids and part.part_id in selected_ids]
+        selected_ids = selected_ids or [part.part_id for part in p.parts]
+        chosen = [part for part in p.parts if part.part_id in selected_ids]
         if selected_ids and (not chosen or len(set(selected_ids)) != len(chosen)):
             raise EngineError("PART_NOT_FOUND", "Export selection contains an unknown part", status=404)
         if chosen:
+            p.stage_metadata["export_policy"]="parts_only_v1"
             part_files = {}
             for part in chosen:
                 part_data = self.storage.get(self.key(p, f"vectors/{part.part_id}.svg"))
@@ -544,40 +580,11 @@ class Engine:
                 exports["zip"] = key
                 p.usage["export_operations"] += 1
             return {"exports": exports, "part_files": part_files, "export_errors": failures, "success": not failures}
-        for format in [f for f in formats if f != "zip"]:
-            if cancelled():
-                raise EngineError("JOB_CANCELLED", "Export cancelled")
-            prefix = "hybrid-master" if p.validation["embedded_rasters"] else "master"
-            key = self.key(p, f"exports/{prefix}.{format}")
-            try:
-                if format == "svg":
-                    output = data
-                elif format == "png":
-                    output = ingest.png_bytes(render_svg(data))
-                else:
-                    output = exporter.convert(data, format, self.settings.tool_timeout_seconds, p.settings.export_mode)
-                self.storage.put(key, output)
-                p.exports[format] = key
-                p.usage["export_operations"] += 1
-            except EngineError as exc:
-                failures[format] = exc.as_dict()
-        if "zip" in formats:
-            key = self.key(p, "exports/production-pack.zip")
-            self.storage.put(key, self.pack(p))
-            p.exports["zip"] = key
-            p.usage["export_operations"] += 1
-        if failures:
-            p.error = {"code": "EXPORT_CONVERSION_FAILED", "message": "One or more exports failed; successful files and validated SVG were preserved", "formats": failures, "recoverable": True}
-        return {"exports": p.exports, "export_errors": failures, "success": not failures}
+        raise EngineError('INVALID_EXPORT_SELECTION','No real production parts selected')
 
     def pack(self, p: Project, selected_ids: set[str] | None = None) -> bytes:
         stream = BytesIO()
         with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
-            if selected_ids is None:
-                archive.writestr("master.svg", self.storage.get(p.master_svg))
-                for format, key in p.exports.items():
-                    if format in {"pdf", "eps", "png"} and self.storage.exists(key):
-                        archive.writestr("master." + format, self.storage.get(key))
             for part in p.parts:
                 if selected_ids is not None and part.part_id not in selected_ids:
                     continue
@@ -587,17 +594,24 @@ class Engine:
                 for format, export_key in part.exports.items():
                     if format != "svg" and self.storage.exists(export_key):
                         archive.writestr(f"parts/{part.type}-{part.part_id}.{format}", self.storage.get(export_key))
-            for name, key in p.previews.items():
-                if self.storage.exists(key):
-                    archive.writestr(f"previews/{name}{Path(key).suffix}", self.storage.get(key))
-            archive.writestr("metadata/project.json", p.model_dump_json(indent=2))
+            for part in p.parts:
+                if selected_ids is not None and part.part_id not in selected_ids:
+                    continue
+                if part.clean_reference:
+                    archive.writestr(f"previews/{part.part_id}-reference.png", self.storage.get(part.clean_reference))
+                key = self.key(p, f"vectors/{part.part_id}.svg")
+                archive.writestr(f"previews/{part.part_id}-vector.png", ingest.png_bytes(render_svg(self.storage.get(key),part.bbox[2],part.bbox[3])))
+            public_metadata=p.model_dump(exclude={'assistant_sessions','master_svg','exports','previews'})
+            if selected_ids:
+                public_metadata['parts']=[a for a in public_metadata['parts'] if a['part_id'] in selected_ids]
+            archive.writestr("metadata/project.json", json.dumps(public_metadata,indent=2))
             archive.writestr("metadata/validation.json", json.dumps(p.validation, indent=2))
             archive.writestr("metadata/palette.json", json.dumps(p.palette, indent=2))
             archive.writestr("metadata/export-selection.json", json.dumps({"part_ids": sorted(selected_ids) if selected_ids else [part.part_id for part in p.parts],
-                                                                           "includes_master": selected_ids is None}))
+                                                                           "includes_master": False}))
             archive.writestr("README.txt", "ReVector production pack\nSVG contains editable geometry and no embedded raster.\nDimensions are " +
                              ("calibrated." if p.settings.known_width_mm else "uncalibrated; supply known_width_mm before physical production.") +
-                             "\nIndividual part files use supplied part dimensions when present; master preserves the source layout.\n"
+                             "\nIndividual part files use supplied dimensions when present. No assembled pattern is included.\n"
                              "Review difference preview and warnings. Static Illustrator compatibility is not an Adobe application test.\n")
         return stream.getvalue()
 
@@ -614,7 +628,7 @@ class Engine:
                 raise EngineError("PART_LOCKED", "Unlock the part before editing", status=409)
             if action == "add":
                 mask = segmentation.manual_mask(image.size, changes["polygon"])
-                p.parts.append(self._create_part(p, mask, {k: v for k, v in changes.items() if k in {"type", "name", "polygon", "confirmed"}}))
+                p.parts.append(self._create_part(p, mask, {"source":"manual",**{k: v for k, v in changes.items() if k in {"type", "name", "polygon", "confirmed"}}}))
                 self.invalidate(p, "compose")
             elif action == "remove":
                 p.parts = [item for item in p.parts if item.part_id != part_id]
@@ -629,6 +643,7 @@ class Engine:
                     mask = segmentation.manual_mask(image.size, changes["polygon"])
                     crop, bbox, local_mask = segmentation.crop_mask(image, mask)
                     self.invalidate(p, "reconstruct", {part.part_id})
+                    part.source = "manual"
                     part.bbox, part.polygon = bbox, [tuple(point) for point in changes["polygon"]]
                     self.put_image(part.mask, local_mask)
                     self.put_image(part.corrected_crop, crop)
@@ -665,6 +680,17 @@ class Engine:
                 self.invalidate(p, "compose")
             else:
                 raise EngineError("NOT_IMPLEMENTED", "Unknown manual correction action")
+            from app.ai.contracts import SLOTS
+            for slot in p.slots.values():
+                matches=[item for item in p.parts if item.type==slot.part_type.lower()]
+                if len(matches)==1:
+                    slot.part_id=matches[0].part_id
+                    slot.status='confirmed' if matches[0].confirmed else 'manual'
+                elif len(matches)>1:
+                    slot.status='uncertain'
+                elif slot.status!='blank':
+                    slot.part_id=None;slot.status='missing'
+            p.ai_metadata.pop('review',None)
             p.cache.pop("segment", None)
             p.manual_changes.append({"action": action, "part_id": part_id, "changes": changes, "timestamp": now()})
             if not p.parts or any(not item.clean_reference for item in p.parts):

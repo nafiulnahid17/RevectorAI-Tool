@@ -8,7 +8,7 @@ from app.core.config import Settings, capabilities
 from app.core.engine import Engine
 from app.core.exceptions import EngineError
 from app.jobs.queue import LocalJobQueue
-from app.api import projects, upload, processing
+from app.api import projects, upload, processing, upgrade
 from app.core.readiness import readiness
 from app.core.security import authenticate
 from app.core.upload_guard import UploadGuard
@@ -34,6 +34,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(EngineError)
     async def engine_error(request: Request, error: EngineError):
+        from app.errors.service import request_error
+        if not error.normalized:
+            error.normalized = request_error(request,error.code,error.message,error.recoverable)
         return JSONResponse(status_code=error.status, content={"success": False, "error": error.as_dict()})
 
     app.add_middleware(UploadGuard, limit=settings.max_upload_bytes + 1024 * 1024)
@@ -47,6 +50,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             try:
                 authenticate(request, settings)
             except EngineError as error:
+                from app.errors.normalization import normalize
+                error.normalized = normalize(error.code,error.message,error.recoverable,phase='authentication')
                 return JSONResponse(status_code=error.status, content={'success': False, 'error': error.as_dict()},
                                     headers={'Cache-Control': 'no-store'})
         response = await call_next(request)
@@ -68,6 +73,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(upload.router)
     app.include_router(processing.router)
+    app.include_router(upgrade.router)
+
+    from fastapi.exceptions import RequestValidationError
+    from starlette.exceptions import HTTPException
+    from app.errors.normalization import normalize
+    from app.errors.service import request_error
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request, exc):
+        # Never return Pydantic's input field: it can contain credentials/oversized data.
+        return JSONResponse(status_code=422,content={'success':False,'error':request_error(request,'INVALID_REQUEST','Request fields did not match the API contract',False)})
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request, exc):
+        code = exc.detail.get('code','REQUEST_FAILED') if isinstance(exc.detail,dict) else 'REQUEST_FAILED'
+        message = exc.detail.get('message','Request failed') if isinstance(exc.detail,dict) else str(exc.detail)
+        return JSONResponse(status_code=exc.status_code,content={'success':False,'error':request_error(request,code,message)})
+
+    @app.exception_handler(Exception)
+    async def unknown_error(request, exc):
+        return JSONResponse(status_code=500,content={'success':False,'error':request_error(request,'UNKNOWN_ERROR','Unexpected server failure; contact the operator with this error id')})
     @app.get('/')
     def root():
         return {'engine': 'ReVector', 'service': 'API', 'website': 'deployed separately on Cloudflare'}

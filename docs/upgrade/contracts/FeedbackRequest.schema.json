@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "part_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Part Id"
+    },
+    "error_id": {
+      "title": "Error Id",
+      "type": "string"
+    },
+    "action": {
+      "title": "Action",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "SUCCESS",
+        "FAILED",
+        "CANCELLED"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "error_id",
+    "action",
+    "outcome"
+  ],
+  "title": "FeedbackRequest",
+  "type": "object"
+}

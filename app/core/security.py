@@ -32,4 +32,5 @@ def project_access(request: Request, project_id: str):
     if not request.app.state.engine.settings.allow_unauthenticated and project.user_id != principal:
         # Same result as a nonexistent project; do not reveal another user's data.
         raise EngineError('FILE_NOT_FOUND', 'Project does not exist', status=404)
+    request.state.project_id = project.project_id
     return project

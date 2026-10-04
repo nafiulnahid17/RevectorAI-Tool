@@ -1,0 +1,68 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "maxLength": 120,
+      "title": "Title",
+      "type": "string"
+    },
+    "explanation": {
+      "maxLength": 2000,
+      "title": "Explanation",
+      "type": "string"
+    },
+    "likely_causes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5,
+      "title": "Likely Causes",
+      "type": "array"
+    },
+    "severity": {
+      "default": "unknown",
+      "enum": [
+        "recoverable",
+        "fatal",
+        "unknown"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "cause_status": {
+      "default": "unknown",
+      "enum": [
+        "known",
+        "likely",
+        "unknown"
+      ],
+      "title": "Cause Status",
+      "type": "string"
+    },
+    "recommended_action": {
+      "title": "Recommended Action",
+      "type": "string"
+    },
+    "secondary_actions": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 8,
+      "title": "Secondary Actions",
+      "type": "array"
+    },
+    "user_message": {
+      "maxLength": 2000,
+      "title": "User Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "explanation",
+    "recommended_action",
+    "user_message"
+  ],
+  "title": "Advice",
+  "type": "object"
+}

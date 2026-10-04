@@ -67,13 +67,21 @@ def main():
         p = engine.load(p.project_id)
         if args.output:
             args.output.mkdir(parents=True, exist_ok=True)
-            for format, key in p.exports.items():
-                (args.output / ("production-pack.zip" if format == "zip" else f"master.{format}")).write_bytes(engine.storage.get(key))
-            (args.output / "project.json").write_text(p.model_dump_json(indent=2))
+            for part in p.parts:
+                for format,key in (export_result or {}).get('part_files',{}).get(part.part_id,{}).items():
+                    target=args.output/'parts'/f'{part.type}-{part.part_id}.{format}'
+                    target.parent.mkdir(parents=True,exist_ok=True)
+                    target.write_bytes(engine.storage.get(key))
+                if part.clean_reference:
+                    target=args.output/'previews'/f'{part.part_id}-reference.png'
+                    target.parent.mkdir(parents=True,exist_ok=True)
+                    target.write_bytes(engine.storage.get(part.clean_reference))
+            zip_key=(export_result or {}).get('exports',{}).get('zip')
+            if zip_key:
+                (args.output/'parts-only-production.zip').write_bytes(engine.storage.get(zip_key))
+            (args.output / "project.json").write_text(p.model_dump_json(indent=2,exclude={'assistant_sessions','master_svg'}))
             if p.validation:
                 (args.output / "validation.json").write_text(json.dumps(p.validation, indent=2))
-            for name, key in p.previews.items():
-                (args.output / (name + Path(key).suffix)).write_bytes(engine.storage.get(key))
         print(json.dumps({"project_id": p.project_id, "state": p.state, "true_vector_ready": p.true_vector_ready,
                           "parts": [{"id": x.part_id, "type": x.type, "metrics": x.metrics} for x in p.parts],
                           "validation": p.validation, "analysis": p.analysis if args.command == "analyze" else None,

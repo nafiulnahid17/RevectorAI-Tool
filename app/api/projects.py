@@ -7,7 +7,13 @@ router = APIRouter(prefix="/api/revector", tags=["projects and manual correction
 
 
 def public_project(project):
-    return {**project.model_dump(mode="json"), "true_vector_ready": project.true_vector_ready}
+    result = project.model_dump(mode="json")
+    result['previews'] = {k:v for k,v in result['previews'].items() if k not in {'vector_view','nodes'}}
+    result.pop('assistant_sessions',None)
+    result['exports']={k:v for k,v in result['exports'].items() if k.startswith('selected_zip_')}
+    result['true_vector_ready'] = project.true_vector_ready
+    result['ai_capabilities'] = {'native_ai_export':False}
+    return result
 
 
 @router.post("/projects", status_code=201)
@@ -99,12 +105,13 @@ def artifact(project_id: str, artifact_path: str, request: Request):
     from fastapi.responses import FileResponse
     p = project_access(request, project_id)
     key = f"projects/{project_id}/{artifact_path}"
-    allowed = {p.source_file, p.working_image, p.corrected_image, p.thumbnail, p.master_svg,
-               *p.previews.values(), *p.exports.values()}
+    allowed = {p.source_file, p.working_image, p.corrected_image, p.thumbnail,
+               *[v for k,v in p.previews.items() if k not in {'vector_view','nodes'}], *p.exports.values(), *p.ai_assets.values()}
     for part in p.parts:
         allowed.update([part.mask, part.source_crop, part.corrected_crop, part.clean_reference, part.vectorization_source, part.vector,
                         request.app.state.engine.key(p, f"vectors/{part.part_id}.svg")])
         allowed.update(part.exports.values())
+        allowed.update(part.previews.values())
     allowed.add(request.app.state.engine.key(p, "reports/validation.json"))
     if key not in allowed or not request.app.state.engine.storage.exists(key):
         raise HTTPException(404, "Artifact does not exist in the current project manifest")

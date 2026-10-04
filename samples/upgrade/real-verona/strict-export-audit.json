@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "parts": [
+    {
+      "part": "back_body",
+      "paths": 18,
+      "anchors": 1424,
+      "rasters": 0
+    },
+    {
+      "part": "back_collar",
+      "paths": 4,
+      "anchors": 431,
+      "rasters": 0
+    },
+    {
+      "part": "front_body",
+      "paths": 70,
+      "anchors": 2481,
+      "rasters": 0
+    },
+    {
+      "part": "front_collar",
+      "paths": 10,
+      "anchors": 755,
+      "rasters": 0
+    },
+    {
+      "part": "left_sleeve",
+      "paths": 10,
+      "anchors": 1108,
+      "rasters": 0
+    },
+    {
+      "part": "right_sleeve",
+      "paths": 7,
+      "anchors": 810,
+      "rasters": 0
+    }
+  ],
+  "pdf_eps_parser": "Poppler and Ghostscript",
+  "adobe_illustrator": "NOT_RUN",
+  "live_ai": "NOT_RUN"
+}

@@ -1,0 +1,114 @@
+{
+  "additionalProperties": true,
+  "properties": {
+    "error_id": {
+      "title": "Error Id",
+      "type": "string"
+    },
+    "error_code": {
+      "title": "Error Code",
+      "type": "string"
+    },
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
+    "phase": {
+      "title": "Phase",
+      "type": "string"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Job Id"
+    },
+    "part_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Part Id"
+    },
+    "part_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Part Type"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "technical_summary": {
+      "title": "Technical Summary",
+      "type": "string"
+    },
+    "retryable": {
+      "title": "Retryable",
+      "type": "boolean"
+    },
+    "recoverable": {
+      "title": "Recoverable",
+      "type": "boolean"
+    },
+    "suggested_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suggested Actions",
+      "type": "array"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "error_id",
+    "error_code",
+    "code",
+    "category",
+    "phase",
+    "message",
+    "technical_summary",
+    "retryable",
+    "recoverable",
+    "timestamp"
+  ],
+  "title": "ErrorEvent",
+  "type": "object"
+}

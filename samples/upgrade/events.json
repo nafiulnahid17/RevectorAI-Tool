@@ -1,0 +1,216 @@
+[
+  {
+    "event": "UPLOAD_RECEIVED",
+    "timestamp": "2026-10-04T04:05:30.499628+00:00"
+  },
+  {
+    "event": "ANALYZING_ARTWORK",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.586954+00:00"
+  },
+  {
+    "event": "ANALYZING_ARTWORK",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.786443+00:00"
+  },
+  {
+    "event": "ENHANCING_ARTWORK",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.793987+00:00"
+  },
+  {
+    "event": "CREATING_PATTERN_MOCKUP",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.817442+00:00"
+  },
+  {
+    "event": "IDENTIFYING_PARTS",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.845163+00:00"
+  },
+  {
+    "event": "REFINING_PART_BOUNDARIES",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:30.847137+00:00"
+  },
+  {
+    "event": "PART_REVIEW_READY",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:31.122238+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_a029775fbed64219",
+    "timestamp": "2026-10-04T04:05:31.264587+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_a029775fbed64219",
+    "timestamp": "2026-10-04T04:05:31.282315+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_a029775fbed64219",
+    "timestamp": "2026-10-04T04:05:31.319070+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_a029775fbed64219",
+    "timestamp": "2026-10-04T04:05:31.330197+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_b1c1938f28424c45",
+    "timestamp": "2026-10-04T04:05:31.332539+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_b1c1938f28424c45",
+    "timestamp": "2026-10-04T04:05:31.349695+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_b1c1938f28424c45",
+    "timestamp": "2026-10-04T04:05:31.392590+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_b1c1938f28424c45",
+    "timestamp": "2026-10-04T04:05:31.402373+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_d4b017f226214628",
+    "timestamp": "2026-10-04T04:05:31.404384+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_d4b017f226214628",
+    "timestamp": "2026-10-04T04:05:31.421005+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_d4b017f226214628",
+    "timestamp": "2026-10-04T04:05:31.453415+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_d4b017f226214628",
+    "timestamp": "2026-10-04T04:05:31.463538+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_a5e33caec42c43bf",
+    "timestamp": "2026-10-04T04:05:31.466015+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_a5e33caec42c43bf",
+    "timestamp": "2026-10-04T04:05:31.482955+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_a5e33caec42c43bf",
+    "timestamp": "2026-10-04T04:05:31.517439+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_a5e33caec42c43bf",
+    "timestamp": "2026-10-04T04:05:31.527970+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_ebe47f2d9aef4d26",
+    "timestamp": "2026-10-04T04:05:31.530304+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_ebe47f2d9aef4d26",
+    "timestamp": "2026-10-04T04:05:31.548741+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_ebe47f2d9aef4d26",
+    "timestamp": "2026-10-04T04:05:31.584632+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_ebe47f2d9aef4d26",
+    "timestamp": "2026-10-04T04:05:31.597132+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_7a93890b90f24822",
+    "timestamp": "2026-10-04T04:05:31.599520+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_7a93890b90f24822",
+    "timestamp": "2026-10-04T04:05:31.616037+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_7a93890b90f24822",
+    "timestamp": "2026-10-04T04:05:31.649483+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_7a93890b90f24822",
+    "timestamp": "2026-10-04T04:05:31.659579+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_c422e881af20426c",
+    "timestamp": "2026-10-04T04:05:31.662033+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_c422e881af20426c",
+    "timestamp": "2026-10-04T04:05:31.680763+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_c422e881af20426c",
+    "timestamp": "2026-10-04T04:05:31.728575+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_c422e881af20426c",
+    "timestamp": "2026-10-04T04:05:31.746463+00:00"
+  },
+  {
+    "event": "RECONSTRUCTING_PART",
+    "part_id": "part_851f67c6ea1a4965",
+    "timestamp": "2026-10-04T04:05:31.750441+00:00"
+  },
+  {
+    "event": "TRACING_VECTOR",
+    "part_id": "part_851f67c6ea1a4965",
+    "timestamp": "2026-10-04T04:05:31.778635+00:00"
+  },
+  {
+    "event": "OPTIMIZING_VECTOR",
+    "part_id": "part_851f67c6ea1a4965",
+    "timestamp": "2026-10-04T04:05:31.827785+00:00"
+  },
+  {
+    "event": "VECTOR_READY",
+    "part_id": "part_851f67c6ea1a4965",
+    "timestamp": "2026-10-04T04:05:31.838240+00:00"
+  },
+  {
+    "event": "VALIDATING_VECTOR",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:31.856455+00:00"
+  },
+  {
+    "event": "VALIDATION_PASSED",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:32.674541+00:00"
+  },
+  {
+    "event": "EXPORT_READY",
+    "part_id": null,
+    "timestamp": "2026-10-04T04:05:32.676321+00:00"
+  }
+]

@@ -108,6 +108,7 @@ def validate_svg(data: bytes | str, *, max_bytes: int = 32 * 1024 * 1024, max_pi
     ids = {}
     refs = []
     meaningful = 0
+    degenerate = 0
     parent = {child: e for e in root.iter() for child in e}
     for e in root.iter():
         tag = e.tag.split("}")[-1]
@@ -154,6 +155,9 @@ def validate_svg(data: bytes | str, *, max_bytes: int = 32 * 1024 * 1024, max_pi
                 path = parse_path(d)
                 if not path:
                     raise ValueError("Empty path")
+                if all(segment.start == segment.end and all(getattr(segment,control,segment.start) == segment.start for control in ("control","control1","control2")) for segment in path):
+                    degenerate += 1
+                    raise ValueError("Degenerate path")
                 report["total_anchor_count"] += len(path) + len(re.findall("[Mm]", d))
             if tag in {"polygon", "polyline"}:
                 points = numbers(e.get("points", ""))
@@ -253,6 +257,7 @@ def validate_svg(data: bytes | str, *, max_bytes: int = 32 * 1024 * 1024, max_pi
             walk(node)
     except (ValueError, RecursionError):
         errors.append("Cyclic SVG resource references")
+    report["degenerate_object_count"] = degenerate
     report["meaningful_shape_count"] = meaningful
     report["errors"] = list(dict.fromkeys(errors))
     report["warnings"] = list(dict.fromkeys(warnings))

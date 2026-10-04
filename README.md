@@ -1,3 +1,7 @@
+> **Production upgrade:** See [AI-assisted production and global assistant](docs/upgrade/PRODUCTION_UPGRADE.md).
+> Public downloads are now individual parts only. Internal composition is retained
+> for validation; no assembled master is exported. Native `.AI` is unavailable.
+
 # ReVector Core Engine
 
 Python 3.12 raster-to-vector API for JerseyOS. This repository contains **only the

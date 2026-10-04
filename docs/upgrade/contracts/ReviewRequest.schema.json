@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "SlotDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "confirmed",
+            "blank"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "part_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part Id"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SlotDecision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "part_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Part Id"
+    },
+    "decisions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/SlotDecision"
+      },
+      "propertyNames": {
+        "enum": [
+          "LEFT_SLEEVE",
+          "RIGHT_SLEEVE",
+          "FRONT_BODY",
+          "BACK_BODY",
+          "FRONT_COLLAR",
+          "BACK_COLLAR",
+          "TOP_TRIM",
+          "BOTTOM_TRIM"
+        ]
+      },
+      "title": "Decisions",
+      "type": "object"
+    }
+  },
+  "required": [
+    "project_id",
+    "decisions"
+  ],
+  "title": "ReviewRequest",
+  "type": "object"
+}

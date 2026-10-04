@@ -46,3 +46,17 @@ def test_gradient_is_real_gradient_with_measured_residual():
 
 def test_irregular_texture_not_claimed_as_gradient():
     assert fit_linear(Image.open(FIXTURES / "splatter.png")) is None
+
+
+def test_native_timeout_uses_contours_without_accepting_invalid_geometry(monkeypatch):
+    from app.pipeline.vectorization import vectorize
+    from app.vector import vtracer_engine
+    from app.core.exceptions import EngineError
+    from PIL import Image,ImageDraw
+    from app.models.project import ProcessingSettings
+    image=Image.new('RGBA',(80,80));ImageDraw.Draw(image).rectangle((10,10,70,70),fill='purple')
+    def timeout(*args,**kwargs):raise EngineError('VECTOR_TRACE_FAILED','native timed out')
+    monkeypatch.setattr(vtracer_engine,'trace',timeout)
+    root,metadata=vectorize(image,image,ProcessingSettings(gradients=False),2)
+    assert metadata['backend']=='opencv_color_contours' and metadata['fallback_attempted']
+    assert metadata['attempts'][0]['status']=='FAILED'

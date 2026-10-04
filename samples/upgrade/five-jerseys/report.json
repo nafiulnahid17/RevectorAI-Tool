@@ -1,0 +1,305 @@
+{
+  "generated_at_dhaka": "2026-10-04T11:10:38.740784+06:00",
+  "workflow": "Download \u2192 assistant source analysis \u2192 image_gen enhancement \u2192 image_gen mockup \u2192 correction review \u2192 assistant semantics + OpenCV exact masks \u2192 8-slot review \u2192 reconstruction \u2192 VTracer \u2192 cleanup/optimization \u2192 validation \u2192 isolated contour fallback test \u2192 actual SVG fill edit + revalidation \u2192 individual SVG/EPS/PDF/ZIP downloads \u2192 independent import/edit/scale checks",
+  "technical_status": "PASS",
+  "production_design_status": "REVIEW_REQUIRED",
+  "live_engine_ai_api_calls": 0,
+  "image_tool_calls": 12,
+  "model_switch": "UNAVAILABLE",
+  "adobe_illustrator": "NOT_RUN",
+  "equivalent_tools": [
+    "Inkscape",
+    "resvg-py",
+    "Poppler",
+    "Ghostscript"
+  ],
+  "total_parts": 40,
+  "total_paths": 821,
+  "total_anchors": 38459,
+  "embedded_rasters": 0,
+  "final_regression": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "tests": "162",
+    "time": "34.028",
+    "timestamp": "2026-10-04T05:03:12.748961+00:00",
+    "hostname": "37b3bcb8e812"
+  },
+  "cases": [
+    {
+      "run": 1,
+      "parts": 8,
+      "paths": 170,
+      "anchors": 7864,
+      "rasters": 0,
+      "engine_seconds": 46.9116,
+      "imagegen_seconds": {
+        "enhancement": 156.0,
+        "mockup": 186.0,
+        "structural_prompt_retry": 71.0
+      },
+      "technical": "PASS",
+      "production_design": "REVIEW_REQUIRED",
+      "logo_delta_e_before": 26.154687881469727,
+      "logo_delta_e_after": 6.698014736175537
+    },
+    {
+      "run": 2,
+      "parts": 8,
+      "paths": 115,
+      "anchors": 7189,
+      "rasters": 0,
+      "engine_seconds": 31.9865,
+      "imagegen_seconds": {
+        "enhancement": 156.0,
+        "mockup": 186.0,
+        "structural_prompt_retry": 0
+      },
+      "technical": "PASS",
+      "production_design": "REVIEW_REQUIRED",
+      "logo_delta_e_before": 37.753440856933594,
+      "logo_delta_e_after": 10.905482292175293
+    },
+    {
+      "run": 3,
+      "parts": 8,
+      "paths": 312,
+      "anchors": 12121,
+      "rasters": 0,
+      "engine_seconds": 40.5766,
+      "imagegen_seconds": {
+        "enhancement": 156.0,
+        "mockup": 186.0,
+        "structural_prompt_retry": 0
+      },
+      "technical": "PASS",
+      "production_design": "REVIEW_REQUIRED",
+      "logo_delta_e_before": 20.25637435913086,
+      "logo_delta_e_after": 6.440536022186279
+    },
+    {
+      "run": 4,
+      "parts": 8,
+      "paths": 52,
+      "anchors": 4161,
+      "rasters": 0,
+      "engine_seconds": 25.3623,
+      "imagegen_seconds": {
+        "enhancement": 156.0,
+        "mockup": 186.0,
+        "structural_prompt_retry": 71.0
+      },
+      "technical": "PASS",
+      "production_design": "REVIEW_REQUIRED",
+      "logo_delta_e_before": 22.683185577392578,
+      "logo_delta_e_after": 2.8076579570770264
+    },
+    {
+      "run": 5,
+      "parts": 8,
+      "paths": 172,
+      "anchors": 7124,
+      "rasters": 0,
+      "engine_seconds": 33.488,
+      "imagegen_seconds": {
+        "enhancement": 131.0,
+        "mockup": 155.0,
+        "structural_prompt_retry": 0
+      },
+      "technical": "PASS",
+      "production_design": "REVIEW_REQUIRED",
+      "logo_delta_e_before": 19.428436279296875,
+      "logo_delta_e_after": 6.278423309326172
+    }
+  ],
+  "timings": [
+    {
+      "run": 1,
+      "source": "File:1920s Wales Junior Football Shirt.jpg",
+      "times": {
+        "Download": 0.701,
+        "MPO\u2192JPEG normalization": 0.5153,
+        "Ingest/EXIF normalization": 5.5201,
+        "CV quality analysis": 1.1238,
+        "AI enhancement tool": 156.0,
+        "AI mockup tool": 186.0,
+        "AI correction retry": 71.0,
+        "CV boundary/crop handoff + artifact replay": 6.5291,
+        "Part review API operations": 1.0141,
+        "Raster reconstruction, all 8": 3.4055,
+        "Primary vector trace, all 8": 1.0392,
+        "Optimization, all 8": 0.2706,
+        "Initial composition": 0.4902,
+        "Initial validation/render": 4.4907,
+        "Contour fallback + project revalidation": 5.1446,
+        "Actual fill edit/restore + revalidations": 7.8288,
+        "Export SVG, all parts": 0.8366,
+        "Export EPS, all parts": 4.0574,
+        "Export PDF, all parts": 3.3134,
+        "Export ZIP, all parts": 1.1584,
+        "Complete backend test workflow": 46.9116,
+        "Independent checks, sum of 8 parallel tasks": 20.6336
+      },
+      "known_processing_sum_seconds": 461.128,
+      "ai_analysis_latency": null,
+      "semantic_model_latency": null
+    },
+    {
+      "run": 2,
+      "source": "File:Eng1966 football shirt.jpeg",
+      "times": {
+        "Download": 0.438,
+        "MPO\u2192JPEG normalization": 0,
+        "Ingest/EXIF normalization": 2.7866,
+        "CV quality analysis": 0.7561,
+        "AI enhancement tool": 156.0,
+        "AI mockup tool": 186.0,
+        "AI correction retry": 0,
+        "CV boundary/crop handoff + artifact replay": 3.5107,
+        "Part review API operations": 0.4093,
+        "Raster reconstruction, all 8": 2.419,
+        "Primary vector trace, all 8": 0.8362,
+        "Optimization, all 8": 0.1379,
+        "Initial composition": 0.1689,
+        "Initial validation/render": 2.7472,
+        "Contour fallback + project revalidation": 3.2145,
+        "Actual fill edit/restore + revalidations": 5.964,
+        "Export SVG, all parts": 0.7451,
+        "Export EPS, all parts": 3.6222,
+        "Export PDF, all parts": 3.2003,
+        "Export ZIP, all parts": 0.9921,
+        "Complete backend test workflow": 31.9865,
+        "Independent checks, sum of 8 parallel tasks": 16.8517
+      },
+      "known_processing_sum_seconds": 374.424,
+      "ai_analysis_latency": null,
+      "semantic_model_latency": null
+    },
+    {
+      "run": 3,
+      "source": "File:Ilves football shirt 1993.jpg",
+      "times": {
+        "Download": 0.466,
+        "MPO\u2192JPEG normalization": 0,
+        "Ingest/EXIF normalization": 1.0459,
+        "CV quality analysis": 0.5032,
+        "AI enhancement tool": 156.0,
+        "AI mockup tool": 186.0,
+        "AI correction retry": 0,
+        "CV boundary/crop handoff + artifact replay": 2.9046,
+        "Part review API operations": 0.3824,
+        "Raster reconstruction, all 8": 2.0964,
+        "Primary vector trace, all 8": 1.2926,
+        "Optimization, all 8": 0.3159,
+        "Initial composition": 1.0278,
+        "Initial validation/render": 3.6513,
+        "Contour fallback + project revalidation": 4.9114,
+        "Actual fill edit/restore + revalidations": 9.7298,
+        "Export SVG, all parts": 1.2907,
+        "Export EPS, all parts": 4.7007,
+        "Export PDF, all parts": 4.2095,
+        "Export ZIP, all parts": 1.8862,
+        "Complete backend test workflow": 40.5766,
+        "Independent checks, sum of 8 parallel tasks": 19.5497
+      },
+      "known_processing_sum_seconds": 383.043,
+      "ai_analysis_latency": null,
+      "semantic_model_latency": null
+    },
+    {
+      "run": 4,
+      "source": "File:Switzerland-home-football-shirt-2006-2007.JPG",
+      "times": {
+        "Download": 0.247,
+        "MPO\u2192JPEG normalization": 0,
+        "Ingest/EXIF normalization": 0.7458,
+        "CV quality analysis": 0.2899,
+        "AI enhancement tool": 156.0,
+        "AI mockup tool": 186.0,
+        "AI correction retry": 71.0,
+        "CV boundary/crop handoff + artifact replay": 2.8008,
+        "Part review API operations": 0.5394,
+        "Raster reconstruction, all 8": 1.8895,
+        "Primary vector trace, all 8": 0.6318,
+        "Optimization, all 8": 0.1024,
+        "Initial composition": 0.0587,
+        "Initial validation/render": 2.7038,
+        "Contour fallback + project revalidation": 2.6796,
+        "Actual fill edit/restore + revalidations": 5.0708,
+        "Export SVG, all parts": 0.5372,
+        "Export EPS, all parts": 3.3274,
+        "Export PDF, all parts": 2.7901,
+        "Export ZIP, all parts": 0.7263,
+        "Complete backend test workflow": 25.3623,
+        "Independent checks, sum of 8 parallel tasks": 15.9164
+      },
+      "known_processing_sum_seconds": 438.609,
+      "ai_analysis_latency": null,
+      "semantic_model_latency": null
+    },
+    {
+      "run": 5,
+      "source": "File:White Nike Brazil CBF pre-match football shirt.JPG",
+      "times": {
+        "Download": 0.588,
+        "MPO\u2192JPEG normalization": 0,
+        "Ingest/EXIF normalization": 3.6392,
+        "CV quality analysis": 0.841,
+        "AI enhancement tool": 131.0,
+        "AI mockup tool": 155.0,
+        "AI correction retry": 0,
+        "CV boundary/crop handoff + artifact replay": 3.2469,
+        "Part review API operations": 0.3775,
+        "Raster reconstruction, all 8": 2.0011,
+        "Primary vector trace, all 8": 0.8172,
+        "Optimization, all 8": 0.1589,
+        "Initial composition": 0.2231,
+        "Initial validation/render": 2.7691,
+        "Contour fallback + project revalidation": 3.1702,
+        "Actual fill edit/restore + revalidations": 6.6176,
+        "Export SVG, all parts": 0.9012,
+        "Export EPS, all parts": 3.79,
+        "Export PDF, all parts": 3.3328,
+        "Export ZIP, all parts": 1.1272,
+        "Complete backend test workflow": 33.488,
+        "Independent checks, sum of 8 parallel tasks": 15.8606
+      },
+      "known_processing_sum_seconds": 320.076,
+      "ai_analysis_latency": null,
+      "semantic_model_latency": null
+    }
+  ],
+  "limitations": "Artwork AI ran in the built-in image tool, outside the engine. A labelled reference bridge replayed those real assets into local secured FastAPI; engine live AI API calls = 0. The image tool exposes no model selector, so live AI model switching was unavailable. Routing/fallback API regressions use explicit mocks. Adobe Illustrator was not installed; Inkscape, resvg, Poppler and Ghostscript provide equivalent vector evidence. Native AI export is unavailable. Unseen backs/collars/trims are inferred proposals, not verified originals. Sleeves/collars/trims are uncalibrated; body viewport uses user-supplied 220 \u00d7 310 mm, not certified sewing geometry. AI analysis/semantic model inference latency is not exposed and was not separately measured. Generator wall time includes tool/queue latency; operations ran concurrently. Engine runs include extra fallback and color-edit tests. First final run overlapped the regression suite; these are measured session timings, not throughput guarantees.",
+  "faults": [
+    {
+      "fault": "Palette color loss",
+      "recovery": "Original median-cut palette lost small crest hues. Coverage seeding plus deterministic LAB refinement fixed this locally; cache version added and 3 regression tests added. Baseline exports retained for before/after audit."
+    },
+    {
+      "fault": "MPO disguised as JPG",
+      "recovery": "Wales source contains two-frame MPO. Current engine rejects it. First frame normalized to genuine JPEG with EXIF orientation; original retained. Native MPO support remains unavailable."
+    },
+    {
+      "fault": "Duplicated Wales laces",
+      "recovery": "First mockup duplicated lacing on body/collar. Same-tool correction retry removed the duplicate."
+    },
+    {
+      "fault": "Attached Swiss collar",
+      "recovery": "First mockup kept a collar band on the body. Same-tool correction retry removed it."
+    },
+    {
+      "fault": "Small branding and mesh",
+      "recovery": "Ilves sponsor spelling and historic crest/font details remain uncertain. Brazil fine mesh and anti-aliased details are simplified. Technical vector PASS does not certify original branding fidelity."
+    },
+    {
+      "fault": "Model switch unavailable",
+      "recovery": "No model selector is exposed by image_gen. Actual deterministic contour fallback tested on one sleeve in every project; live alternate AI-model fallback NOT_RUN."
+    },
+    {
+      "fault": "Harness issues",
+      "recovery": "Initial report used a wrong validation field name; corrected. A geometry probe first selected an overscan/clipped shape that did not change visible pixels; probe now tests visible coordinate edits. Neither issue was bypassed or counted as PASS."
+    }
+  ]
+}

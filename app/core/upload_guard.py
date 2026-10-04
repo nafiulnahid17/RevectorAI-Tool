@@ -1,6 +1,7 @@
 """Bound multipart uploads even when the gateway streams without Content-Length."""
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
+from app.errors.normalization import normalize
 
 
 class UploadGuard:
@@ -17,8 +18,7 @@ class UploadGuard:
                 if length < 0 or length > self.limit:
                     raise ValueError
             except ValueError:
-                response = JSONResponse(status_code=413, content={'success': False, 'error': {
-                    'code': 'UPLOAD_TOO_LARGE', 'message': 'Multipart upload exceeds configured limit', 'recoverable': True}})
+                response = JSONResponse(status_code=413, content={'success': False, 'error': normalize('UPLOAD_TOO_LARGE','Multipart upload exceeds configured limit',phase='upload')})
                 return await response(scope, receive, send)
         consumed = 0
 

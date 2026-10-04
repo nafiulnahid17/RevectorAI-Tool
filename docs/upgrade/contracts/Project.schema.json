@@ -1,0 +1,911 @@
+{
+  "$defs": {
+    "Part": {
+      "properties": {
+        "part_id": {
+          "title": "Part Id",
+          "type": "string"
+        },
+        "type": {
+          "default": "unknown",
+          "enum": [
+            "front_body",
+            "back_body",
+            "left_sleeve",
+            "right_sleeve",
+            "left_shoulder",
+            "right_shoulder",
+            "front_collar",
+            "back_collar",
+            "left_cuff",
+            "right_cuff",
+            "trim",
+            "top_trim",
+            "bottom_trim",
+            "other_part",
+            "unknown"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "name": {
+          "default": "Unknown part",
+          "title": "Name",
+          "type": "string"
+        },
+        "bbox": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Bbox",
+          "type": "array"
+        },
+        "mask": {
+          "title": "Mask",
+          "type": "string"
+        },
+        "source_crop": {
+          "title": "Source Crop",
+          "type": "string"
+        },
+        "corrected_crop": {
+          "title": "Corrected Crop",
+          "type": "string"
+        },
+        "polygon": {
+          "anyOf": [
+            {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Polygon"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "ai_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ai Confidence"
+        },
+        "source": {
+          "default": "engine_refined",
+          "enum": [
+            "ai_detected",
+            "engine_refined",
+            "manual",
+            "ai_reconstructed"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "processing_state": {
+          "default": "DETECTED",
+          "title": "Processing State",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "validation": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Validation"
+        },
+        "previews": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Previews",
+          "type": "object"
+        },
+        "clean_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clean Reference"
+        },
+        "vectorization_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vectorization Source"
+        },
+        "palette": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Palette",
+          "type": "array"
+        },
+        "ocr_results": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Ocr Results",
+          "type": "array"
+        },
+        "decomposition": {
+          "additionalProperties": true,
+          "title": "Decomposition",
+          "type": "object"
+        },
+        "vector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vector"
+        },
+        "metrics": {
+          "additionalProperties": true,
+          "title": "Metrics",
+          "type": "object"
+        },
+        "cache": {
+          "additionalProperties": true,
+          "title": "Cache",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "physical_width_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 10000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Width Mm"
+        },
+        "physical_height_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 10000,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Height Mm"
+        },
+        "bleed_mm": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Bleed Mm",
+          "type": "number"
+        },
+        "safe_zone_mm": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Safe Zone Mm",
+          "type": "number"
+        },
+        "exports": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Exports",
+          "type": "object"
+        }
+      },
+      "required": [
+        "bbox",
+        "mask",
+        "source_crop",
+        "corrected_crop"
+      ],
+      "title": "Part",
+      "type": "object"
+    },
+    "PartRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "default": "unknown",
+          "enum": [
+            "front_body",
+            "back_body",
+            "left_sleeve",
+            "right_sleeve",
+            "left_shoulder",
+            "right_shoulder",
+            "front_collar",
+            "back_collar",
+            "left_cuff",
+            "right_cuff",
+            "trim",
+            "top_trim",
+            "bottom_trim",
+            "other_part",
+            "unknown"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "width_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "title": "Width Mm",
+          "type": "number"
+        },
+        "height_mm": {
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "title": "Height Mm",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "width_mm",
+        "height_mm"
+      ],
+      "title": "PartRequirement",
+      "type": "object"
+    },
+    "PartSlot": {
+      "properties": {
+        "part_type": {
+          "enum": [
+            "LEFT_SLEEVE",
+            "RIGHT_SLEEVE",
+            "FRONT_BODY",
+            "BACK_BODY",
+            "FRONT_COLLAR",
+            "BACK_COLLAR",
+            "TOP_TRIM",
+            "BOTTOM_TRIM"
+          ],
+          "title": "Part Type",
+          "type": "string"
+        },
+        "status": {
+          "default": "missing",
+          "enum": [
+            "detected",
+            "missing",
+            "uncertain",
+            "manual",
+            "ai_reconstructed",
+            "confirmed",
+            "blank"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "part_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part Id"
+        },
+        "ai_confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ai Confidence"
+        },
+        "candidate_bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Bbox"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "part_type"
+      ],
+      "title": "PartSlot",
+      "type": "object"
+    },
+    "ProcessingSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "default": "BALANCED",
+          "enum": [
+            "FAST",
+            "BALANCED",
+            "PRECISION",
+            "ULTRA"
+          ],
+          "title": "Preset",
+          "type": "string"
+        },
+        "vector_mode": {
+          "default": "color",
+          "enum": [
+            "precision",
+            "color",
+            "mono",
+            "reconstruction"
+          ],
+          "title": "Vector Mode",
+          "type": "string"
+        },
+        "max_colors": {
+          "default": 12,
+          "maximum": 64,
+          "minimum": 2,
+          "title": "Max Colors",
+          "type": "integer"
+        },
+        "delta_e": {
+          "default": 5,
+          "maximum": 30,
+          "minimum": 0,
+          "title": "Delta E",
+          "type": "number"
+        },
+        "min_region_area": {
+          "default": 6,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Min Region Area",
+          "type": "number"
+        },
+        "segment_min_area_ratio": {
+          "default": 0.01,
+          "maximum": 0.9,
+          "minimum": 0.0001,
+          "title": "Segment Min Area Ratio",
+          "type": "number"
+        },
+        "noise_reduction": {
+          "default": true,
+          "title": "Noise Reduction",
+          "type": "boolean"
+        },
+        "preserve_original_colors": {
+          "default": true,
+          "title": "Preserve Original Colors",
+          "type": "boolean"
+        },
+        "ocr": {
+          "default": false,
+          "title": "Ocr",
+          "type": "boolean"
+        },
+        "text_mode": {
+          "default": "outlined",
+          "enum": [
+            "outlined",
+            "editable"
+          ],
+          "title": "Text Mode",
+          "type": "string"
+        },
+        "gradients": {
+          "default": true,
+          "title": "Gradients",
+          "type": "boolean"
+        },
+        "allow_contour_fallback": {
+          "default": true,
+          "title": "Allow Contour Fallback",
+          "type": "boolean"
+        },
+        "max_trace_dimension": {
+          "anyOf": [
+            {
+              "maximum": 12000,
+              "minimum": 64,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Trace Dimension"
+        },
+        "mockup_width": {
+          "default": 1536,
+          "maximum": 1920,
+          "minimum": 1024,
+          "multipleOf": 16,
+          "title": "Mockup Width",
+          "type": "integer"
+        },
+        "mockup_height": {
+          "default": 1024,
+          "maximum": 1920,
+          "minimum": 768,
+          "multipleOf": 16,
+          "title": "Mockup Height",
+          "type": "integer"
+        },
+        "ai_workflow": {
+          "default": true,
+          "title": "Ai Workflow",
+          "type": "boolean"
+        },
+        "export_mode": {
+          "default": "true_vector",
+          "enum": [
+            "true_vector",
+            "hybrid"
+          ],
+          "title": "Export Mode",
+          "type": "string"
+        },
+        "known_width_mm": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Known Width Mm"
+        },
+        "bleed_mm": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Bleed Mm",
+          "type": "number"
+        },
+        "safe_zone_mm": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Safe Zone Mm",
+          "type": "number"
+        }
+      },
+      "title": "ProcessingSettings",
+      "type": "object"
+    },
+    "State": {
+      "enum": [
+        "PART_REVIEW_READY",
+        "CREATED",
+        "UPLOADED",
+        "ANALYZING",
+        "ANALYZED",
+        "GEOMETRY_CORRECTED",
+        "SEGMENTING",
+        "SEGMENTED",
+        "RECONSTRUCTING",
+        "RECONSTRUCTED",
+        "VECTORIZING",
+        "VECTORIZED",
+        "OPTIMIZING",
+        "OPTIMIZED",
+        "COMPOSING",
+        "COMPOSED",
+        "VALIDATING",
+        "VALIDATED",
+        "READY",
+        "FAILED"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "name": {
+      "default": "Untitled",
+      "maxLength": 120,
+      "title": "Name",
+      "type": "string"
+    },
+    "user_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "User Id"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Id"
+    },
+    "state": {
+      "$ref": "#/$defs/State",
+      "default": "CREATED"
+    },
+    "engine_version": {
+      "default": "0.1.0",
+      "title": "Engine Version",
+      "type": "string"
+    },
+    "source_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source File"
+    },
+    "source_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Hash"
+    },
+    "source_metadata": {
+      "additionalProperties": true,
+      "title": "Source Metadata",
+      "type": "object"
+    },
+    "working_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Working Image"
+    },
+    "corrected_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Corrected Image"
+    },
+    "thumbnail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Thumbnail"
+    },
+    "settings": {
+      "$ref": "#/$defs/ProcessingSettings"
+    },
+    "analysis": {
+      "additionalProperties": true,
+      "title": "Analysis",
+      "type": "object"
+    },
+    "geometry": {
+      "additionalProperties": true,
+      "title": "Geometry",
+      "type": "object"
+    },
+    "parts": {
+      "items": {
+        "$ref": "#/$defs/Part"
+      },
+      "title": "Parts",
+      "type": "array"
+    },
+    "slots": {
+      "additionalProperties": {
+        "$ref": "#/$defs/PartSlot"
+      },
+      "title": "Slots",
+      "type": "object"
+    },
+    "ai_assets": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Ai Assets",
+      "type": "object"
+    },
+    "ai_metadata": {
+      "additionalProperties": true,
+      "title": "Ai Metadata",
+      "type": "object"
+    },
+    "events": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "error_history": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Error History",
+      "type": "array"
+    },
+    "assistant_sessions": {
+      "additionalProperties": true,
+      "title": "Assistant Sessions",
+      "type": "object"
+    },
+    "production_specifications": {
+      "items": {
+        "$ref": "#/$defs/PartRequirement"
+      },
+      "maxItems": 100,
+      "title": "Production Specifications",
+      "type": "array"
+    },
+    "manual_changes": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Manual Changes",
+      "type": "array"
+    },
+    "palette": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Palette",
+      "type": "array"
+    },
+    "cache": {
+      "additionalProperties": true,
+      "title": "Cache",
+      "type": "object"
+    },
+    "stage_metadata": {
+      "additionalProperties": true,
+      "title": "Stage Metadata",
+      "type": "object"
+    },
+    "master_svg": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Master Svg"
+    },
+    "validation": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Validation"
+    },
+    "previews": {
+      "additionalProperties": true,
+      "title": "Previews",
+      "type": "object"
+    },
+    "exports": {
+      "additionalProperties": true,
+      "title": "Exports",
+      "type": "object"
+    },
+    "usage": {
+      "additionalProperties": true,
+      "title": "Usage",
+      "type": "object"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "title": "Project",
+  "type": "object"
+}

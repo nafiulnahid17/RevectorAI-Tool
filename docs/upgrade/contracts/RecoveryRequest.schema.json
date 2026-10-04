@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "part_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Part Id"
+    },
+    "fallback_trace": {
+      "default": false,
+      "title": "Fallback Trace",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "project_id"
+  ],
+  "title": "RecoveryRequest",
+  "type": "object"
+}

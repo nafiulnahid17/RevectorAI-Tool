@@ -6,6 +6,7 @@ from app.core.exceptions import EngineError
 from app.models.project import ProcessingSettings
 from app.vector import contour, vtracer_engine, potrace_engine
 from app.vector.gradients import fit_linear
+from app.validators.svg_validator import validate_svg
 
 
 def vectorize(reference: Image.Image, source: Image.Image, settings: ProcessingSettings, timeout: int):
@@ -17,6 +18,7 @@ def vectorize(reference: Image.Image, source: Image.Image, settings: ProcessingS
         source = source.resize(size, Image.Resampling.LANCZOS)
         reference = reference.resize(size, Image.Resampling.LANCZOS)
     notes = []
+    attempts = []
     fitted = fit_linear(reference) if settings.gradients and settings.vector_mode != "mono" else None
     if fitted:
         root, metadata = fitted
@@ -31,10 +33,20 @@ def vectorize(reference: Image.Image, source: Image.Image, settings: ProcessingS
                 else:
                     input_path = folder / "source.png"
                     source.save(input_path)
-                    root, metadata = vtracer_engine.trace(input_path, folder / "trace.svg", settings)
+                    root, metadata = vtracer_engine.trace(input_path, folder / "trace.svg", settings, timeout=timeout)
+                # All native trace engines pass the same grammar/integrity gate.
+                for node in list(root.iter()):
+                    for child in list(node):
+                        if child.tag.split('}')[-1]=='path' and not child.get('d','').strip():
+                            node.remove(child)
+                check = validate_svg(ET.tostring(root))
+                if not check['true_vector']:
+                    raise EngineError('INVALID_PATH_GEOMETRY','Native trace failed deterministic geometry validation',diagnostics={'validation_errors':check['errors']})
+                attempts.append({'engine':metadata['backend'],'status':'PASS'})
             except EngineError as exc:
                 if not settings.allow_contour_fallback:
                     raise
+                attempts.append({'engine':'potrace' if settings.vector_mode=='mono' else 'vtracer','status':'FAILED','code':exc.code})
                 notes.append(f"{exc.code}: {exc.message}; deterministic contour fallback used.")
                 root, metadata = contour.trace(source, settings, mono=settings.vector_mode == "mono")
     if scale != 1:
@@ -46,7 +58,10 @@ def vectorize(reference: Image.Image, source: Image.Image, settings: ProcessingS
     root.set("viewBox", f"0 0 {original_size[0]} {original_size[1]}")
     root.set("width", str(original_size[0]))
     root.set("height", str(original_size[1]))
-    metadata.update({"trace_scale": scale, "source_dimensions": list(original_size), "warnings": notes})
+    metadata.update({"attempts":attempts,"fallback_attempted":any(a["status"]=="FAILED" for a in attempts),"trace_scale": scale, "source_dimensions": list(original_size), "warnings": notes})
     if not any(e.tag.split("}")[-1] == "path" for e in root.iter()):
         raise EngineError("VECTOR_TRACE_FAILED", "No meaningful vector paths were produced")
+    check = validate_svg(ET.tostring(root))
+    if not check['true_vector']:
+        raise EngineError('INVALID_PATH_GEOMETRY','Vector fallback also failed geometry checks',diagnostics={'validation_errors':check['errors'],'attempts':attempts})
     return root, metadata

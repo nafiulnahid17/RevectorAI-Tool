@@ -44,6 +44,9 @@ class ExportRequest(StageRequest):
 
 class SettingsUpdate(StrictModel):
     """Partial settings are validated against the stored project after merging."""
+    ai_workflow: bool | None = None
+    mockup_width: int | None = Field(None,ge=1024,le=1920,multiple_of=16)
+    mockup_height: int | None = Field(None,ge=768,le=1920,multiple_of=16)
     preset: Literal["FAST", "BALANCED", "PRECISION", "ULTRA"] | None = None
     vector_mode: Literal["precision", "color", "mono", "reconstruction"] | None = None
     max_colors: int | None = Field(None, ge=2, le=64)

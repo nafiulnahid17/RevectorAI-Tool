@@ -1,3 +1,10 @@
+# Current part-only upgrade contract
+
+See [production upgrade API](upgrade/PRODUCTION_UPGRADE.md) for AI preparation,
+eight-slot confirmation, assistant and recovery. Export without part_ids now means
+all **individual** parts. Master downloads are blocked. Legacy status names remain
+alongside explicit job_state. Historical master-export examples below are superseded.
+
 # API contract
 
 OpenAPI: `GET /openapi.json`. Interactive documentation: `GET /docs`.

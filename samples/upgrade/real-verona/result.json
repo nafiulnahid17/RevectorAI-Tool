@@ -1,0 +1,24 @@
+{
+  "source": "Earlier external-AI reconstruction of real Hellas Verona jersey; no new provider inference",
+  "source_sha256": "512129f7f9fc7186bb60de56ca2ea0c0ab580745a07e6705a4b3a3167d4ceb7a",
+  "parts": 6,
+  "blank_slots": [
+    "TOP_TRIM",
+    "BOTTOM_TRIM"
+  ],
+  "paths": 119,
+  "rasters": 0,
+  "render_succeeded": true,
+  "true_vector": true,
+  "elapsed_seconds": 12.912,
+  "ai_calls": 0,
+  "trace_backends": [
+    "vtracer",
+    "vtracer",
+    "vtracer",
+    "vtracer",
+    "vtracer",
+    "vtracer"
+  ],
+  "native_illustrator": "NOT_RUN"
+}

@@ -65,12 +65,13 @@ def test_api_staged_workflow(tmp_path, simple_bytes):
         assert status["true_vector_ready"]
         result = client.post("/api/revector/export", json={"project_id": pid, "formats": ["svg", "png", "zip"]}).json()
         assert result["status"] == "completed"
-        artifact = client.get(f"/api/revector/projects/{pid}/artifacts/exports/production-pack.zip")
+        key=result["result"]["exports"]["zip"]
+        artifact = client.get(f"/api/revector/projects/{pid}/artifacts/"+key.split(pid+"/")[1])
         assert artifact.status_code == 200
         with zipfile.ZipFile(BytesIO(artifact.content)) as archive:
-            assert "master.svg" in archive.namelist()
+            assert "master.svg" not in archive.namelist()
             assert "metadata/validation.json" in archive.namelist()
-            assert len([f for f in archive.namelist() if f.startswith("parts/")]) == 2
+            assert len([f for f in archive.namelist() if f.startswith("parts/") and f.endswith(".svg")]) == 2
         assert client.get(f"/api/revector/projects/{pid}/artifacts/project.json").status_code == 404
         assert client.put(f"/api/revector/projects/{pid}/settings", json={"known_width_mm": 600}).status_code == 200
         # Physical offsets can be updated independently after the stored project is calibrated.
@@ -166,8 +167,8 @@ def test_real_pdf_eps_conversion(engine):
     p = complete(engine)
     result = engine.run(p.project_id, "export", {"formats": ["svg", "pdf", "eps", "zip"]})
     assert not result["export_errors"]
-    assert engine.storage.get(result["exports"]["pdf"]).startswith(b"%PDF")
-    assert engine.storage.get(result["exports"]["eps"]).startswith(b"%!PS")
+    assert all(engine.storage.get(files["pdf"]).startswith(b"%PDF") for files in result["part_files"].values())
+    assert all(engine.storage.get(files["eps"]).startswith(b"%!PS") for files in result["part_files"].values())
 
 
 def test_traversal_denied(engine):
