@@ -17,7 +17,7 @@ none of these values. `.env.example` contains empty credentials.
 | MAIN_AI_IMAGE_MODEL | Reference-edit image model, separate capability |
 | CLOUDFLARE_ACCOUNT_ID | 32-character account id |
 | CLOUDFLARE_AI_TOKEN | Server-only Workers AI token |
-| CLOUDFLARE_AI_MODEL | Vision/text model; e.g. @cf/meta/llama-3.2-11b-vision-instruct |
+| CLOUDFLARE_AI_MODEL | Vision/text model; live-verified native JSON adapter: @cf/meta/llama-4-scout-17b-16e-instruct |
 | CLOUDFLARE_AI_IMAGE_MODEL | @cf/black-forest-labs/flux-2-klein-4b or flux-2-klein-9b |
 | ERROR_AI_PROVIDER | cloudflare by default; same adapter registry as artwork AI |
 | ERROR_AI_API_KEY | Optional independent error-assistant key |
@@ -42,7 +42,9 @@ is retained in source storage. This provider limitation can lose small branding.
 Vision contract documented at
 https://developers.cloudflare.com/workers-ai/models/llama-3.2-11b-vision-instruct/ .
 An account may need to accept the model license before inference; ReVector never
-automatically accepts legal terms. OpenRouter/custom must actually support the
+automatically accepts legal terms. See [Cloudflare setup](CLOUDFLARE_SETUP.md)
+for the later live verification, selected model, native JSON contract and
+production credential requirements. OpenRouter/custom must actually support the
 configured OpenAI-compatible `/chat/completions` and `/images/edits` APIs. Merely
 selecting a provider does not imply image capability. Unsupported image models or
 responses fail explicitly and route to fallback. Gemini uses generateContent and
