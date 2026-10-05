@@ -15,8 +15,7 @@ engine credential and connects to the engine over HTTPS.
 
 **An SVG extension does not establish vector artwork.** True Vector requires real
 geometry, valid SVG, rendered validation and zero raster images/references.
-No fake `.ai` files or PNG-in-SVG wrappers are exported. OpenAI is not connected;
-the deterministic pipeline does not require an AI API key.
+No fake `.ai` files or PNG-in-SVG wrappers are exported. The deterministic pipeline\nstill does not require AI. AI-assisted production uses one server-side OpenRouter key\nwith operation-specific model routing; model overrides do not modify vector logic.
 
 ## Local installation
 
@@ -38,6 +37,27 @@ provided. For isolated local debugging only, `REVECTOR_ALLOW_UNAUTHENTICATED=tru
 explicitly disables gateway authentication; do not set it on a deployed engine.
 
 See [secure connection](docs/SECURE_CONNECTION.md) and [Railway setup](docs/RAILWAY.md).
+
+### AI production profile
+
+With only OPENROUTER_API_KEY configured, ReVector resolves dedicated models for
+Analyze, Enhance, Mockup Creation, independent Mockup QC, Identify Parts, Missing
+Part reconstruction and Error Assistant. Model IDs live in one versioned profile,
+not in the deterministic workflow. Optional environment overrides can replace one
+operation without modifying the vector engine.
+
+The trusted Master Mockup Command is versioned server-side and identical for
+primary and fallback Mockup Creation. The fallback path is globally limited to two
+actual provider dispatches in a rolling 24-hour window and persisted under the data
+volume. If a required primary call fails while fallback capacity is exhausted, the
+engine returns TOOL_LOCKED_AI_UNAVAILABLE rather than silently selecting a third
+model.
+
+AI image quality (LOW, MEDIUM, HIGH, MAX) is independent from vector presets.
+Mockup Creation remains 4:3 landscape and records requested versus actual
+dimensions. Generated mockups are intermediate raster references only;
+deterministic OpenCV and vector validation remain authoritative.
+
 
 On Debian/Ubuntu, install optional production conversion and OCR tools:
 
@@ -65,8 +85,7 @@ See [architecture](docs/ARCHITECTURE.md) for the local queue's deployment limits
 ## Railway
 
 Deploy this repository as a Docker service with a persistent `/engine/data` volume,
-set `REVECTOR_API_KEY` as a Railway secret, and generate an HTTPS domain after
-`/health/ready` passes. `PORT` is read automatically. One replica and one worker are
+set `REVECTOR_API_KEY` as a Railway secret, and generate an HTTPS domain after\n`/health/ready` passes. For AI-assisted production also set `OPENROUTER_API_KEY`;\nno model variables are required for the built-in production profile. `PORT` is read automatically. One replica and one worker are
 required by the local queue. This service serves the API, not website files.
 
 ## API workflow

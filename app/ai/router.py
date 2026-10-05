@@ -285,29 +285,38 @@ class AIRouter:
                 continue
 
             quota_state = None
+            direct_quota_reservation = False
             if fallback_mode and self.quota:
-                try:
-                    quota_state = self.quota.reserve()
-                except EngineError as exc:
-                    fallback_blocked = True
-                    attempts.append(
-                        {
-                            "provider": provider.name,
-                            "model": getattr(
-                                provider,
-                                "image_model"
-                                if is_image_operation(operation)
-                                else "model",
-                                None,
-                            ),
-                            "code": exc.code,
-                        }
-                    )
-                    break
+                if hasattr(provider, "dispatch_hook"):
+                    provider.dispatch_hook = self.quota.reserve
+                    provider.last_quota_state = None
+                else:
+                    try:
+                        quota_state = self.quota.reserve()
+                        direct_quota_reservation = True
+                    except EngineError as exc:
+                        fallback_blocked = True
+                        attempts.append(
+                            {
+                                "provider": provider.name,
+                                "model": getattr(
+                                    provider,
+                                    "image_model"
+                                    if is_image_operation(operation)
+                                    else "model",
+                                    None,
+                                ),
+                                "code": exc.code,
+                                "dispatched": False,
+                            }
+                        )
+                        break
 
             try:
                 actual_attempts += 1
                 value = getattr(provider, operation)(*args)
+                if fallback_mode and self.quota and not direct_quota_reservation:
+                    quota_state = getattr(provider, "last_quota_state", None)
                 value = self._validate(operation, value)
                 model = getattr(
                     provider,
@@ -333,6 +342,9 @@ class AIRouter:
                 code = (
                     exc.code if isinstance(exc, EngineError) else "AI_RESPONSE_INVALID"
                 )
+                dispatched = True
+                if fallback_mode and self.quota and hasattr(provider, "last_quota_state"):
+                    dispatched = getattr(provider, "last_quota_state", None) is not None
                 attempts.append(
                     {
                         "provider": provider.name,
@@ -344,10 +356,14 @@ class AIRouter:
                             None,
                         ),
                         "code": code,
+                        "dispatched": dispatched,
                     }
                 )
                 if not fallback_mode:
                     primary_failed = True
+                elif code == "FALLBACK_DAILY_LIMIT_REACHED":
+                    fallback_blocked = True
+                    break
 
         diagnostics = {"attempts": attempts}
         if self.quota:

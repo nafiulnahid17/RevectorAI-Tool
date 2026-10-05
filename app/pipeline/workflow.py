@@ -153,10 +153,10 @@ class ProductionWorkflow:
 
             p = e.load(pid)
             image = e.image(p.ai_assets["mockup"])
-            if max(image.size) < 1024:
+            if min(image.size) < 512:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "Mockup is below the minimum reference resolution",
+                    "Mockup is below the minimum safe reference resolution",
                 )
             if abs((image.width / image.height) / (4 / 3) - 1) > 0.05:
                 raise EngineError(
@@ -545,7 +545,8 @@ class ProductionWorkflow:
                 )
                 exc.normalized["diagnostics"] = exc.diagnostics
                 p.usage["ai_calls"] += sum(
-                    "provider" in a for a in exc.diagnostics.get("attempts", [])
+                    bool(a.get("dispatched", "provider" in a))
+                    for a in exc.diagnostics.get("attempts", [])
                 )
                 p.error = exc.normalized
                 p.error_history.append(exc.normalized)

@@ -76,12 +76,16 @@ class HTTPProvider:
         self.model, self.image_model, self.timeout = model, image_model, timeout
         self.transport = transport
         self.last_usage = {}
+        self.dispatch_hook = None
+        self.last_quota_state = None
 
     def auth_headers(self) -> dict[str, str]:
         return {"Authorization": "Bearer " + self.key}
 
     def request(self, path: str, **kwargs) -> dict | bytes:
         try:
+            if self.dispatch_hook:
+                self.last_quota_state = self.dispatch_hook()
             with (
                 httpx.Client(
                     timeout=self.timeout,

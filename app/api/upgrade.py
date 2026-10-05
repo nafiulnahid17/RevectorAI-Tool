@@ -76,10 +76,14 @@ def submit(stage, body, request):
 def ai_capabilities(request: Request):
     e = request.app.state.engine
     quota = e.ai_router.quota_status()
+    primary_configured = bool(
+        getattr(e.ai_router, "_dynamic_openrouter", False)
+        or e.ai_router.primary is not None
+    )
     return {
-        "primary_configured": e.ai_router.configured(),
+        "primary_configured": primary_configured,
         "fallback_configured": e.ai_router.fallback_configured(),
-        "main_ai": {"configured": e.ai_router.configured()},
+        "main_ai": {"configured": primary_configured},
         "fallback_ai": {
             "configured": e.ai_router.fallback_configured(),
             "quota": quota,
