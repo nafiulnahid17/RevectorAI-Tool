@@ -14,7 +14,7 @@ from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
 
 
-PREPARE_VERSION = "prepare/2.3-stable-699ac010"
+PREPARE_VERSION = "prepare/2.3-stable-699ac010-r1"
 
 
 def _normalize_generated_size(
