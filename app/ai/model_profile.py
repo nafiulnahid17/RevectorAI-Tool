@@ -17,22 +17,26 @@ IMAGE_OPERATIONS = frozenset({
 })
 
 DEFAULT_MODELS = {
-    # Stable 699ac010 capability model, now served through OpenRouter.
-    # Llama 4 Scout accepts image input and JSON-schema structured outputs.
-    "analyze_artwork": "meta-llama/llama-4-scout",
-    "identify_parts": "meta-llama/llama-4-scout",
-    "verify_pattern_mockup": "meta-llama/llama-4-scout",
-    "explain_error": "meta-llama/llama-4-scout",
-    # Stable 699ac010 image family, now served through OpenRouter's Image API.
-    "enhance_artwork": "black-forest-labs/flux.2-klein-4b",
-    "create_pattern_mockup": "black-forest-labs/flux.2-klein-4b",
-    "reconstruct_missing_part": "black-forest-labs/flux.2-klein-4b",
+    # OpenAI primary profile. Workflow logic is unchanged; only model selection moves.
+    "analyze_artwork": "openai/gpt-5.6-terra",
+    "identify_parts": "openai/gpt-5.6-terra",
+    "verify_pattern_mockup": "openai/gpt-5.6-terra",
+    "explain_error": "openai/gpt-5.6-luna",
+    "enhance_artwork": "openai/gpt-image-2.5-flare",
+    "create_pattern_mockup": "openai/gpt-image-2.5-flare",
+    "reconstruct_missing_part": "openai/gpt-image-2.5-sunburst",
 }
 
-# OpenRouter already performs provider-level failover for a selected model.
-# Keep local cross-model fallback disabled so a provider error cannot be masked
-# by an unrelated model or blocked by the legacy global fallback quota.
-FALLBACK_MODELS = {operation: "" for operation in OPERATIONS}
+# Cross-vendor fallback profile. Existing retry/quota behavior remains unchanged.
+FALLBACK_MODELS = {
+    "analyze_artwork": "google/gemini-3.8-flash",
+    "identify_parts": "google/gemini-3.8-flash",
+    "verify_pattern_mockup": "google/gemini-3.8-flash",
+    "explain_error": "google/gemini-3.8-flash",
+    "enhance_artwork": "google/gemini-3-pro-image",
+    "create_pattern_mockup": "google/gemini-3-pro-image",
+    "reconstruct_missing_part": "google/gemini-3-pro-image",
+}
 
 ENV_FIELDS = {
     "analyze_artwork": "analyze_model",
