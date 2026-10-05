@@ -49,8 +49,9 @@ operation without modifying the vector engine.
 The trusted Master Mockup Command is versioned server-side and identical for
 primary and fallback Mockup Creation. The fallback path is globally limited to two
 actual provider dispatches in a rolling 24-hour window and persisted under the data
-volume. If a required primary call fails while fallback capacity is exhausted, the
-engine returns TOOL_LOCKED_AI_UNAVAILABLE rather than silently selecting a third
+volume. Structured primary operations retry one transient/invalid response before
+fallback. If fallback capacity is exhausted, the engine returns a recoverable
+AI_PROVIDER_UNAVAILABLE response with retry guidance rather than hard-locking the tool or silently selecting a third
 model.
 
 AI image quality (LOW, MEDIUM, HIGH, MAX) is independent from vector presets.
