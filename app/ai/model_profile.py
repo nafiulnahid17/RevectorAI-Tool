@@ -17,26 +17,29 @@ IMAGE_OPERATIONS = frozenset({
 })
 
 DEFAULT_MODELS = {
-    # OpenRouter's current GA low-latency Gemini 3.1 text/vision route.
+    # Research-backed production default: Gemini 3.1 Flash Lite is GA,
+    # multimodal, inexpensive, low-latency and supports strict JSON Schema.
     "analyze_artwork": "google/gemini-3.1-flash-lite",
     "identify_parts": "google/gemini-3.1-flash-lite",
     "verify_pattern_mockup": "google/gemini-3.1-flash-lite",
     "explain_error": "google/gemini-3.1-flash-lite",
-    # Gemini 3.1 Flash Image (Nano Banana 2) for all reference-image generation.
-    "enhance_artwork": "google/gemini-3.1-flash-image",
-    "create_pattern_mockup": "google/gemini-3.1-flash-image",
-    "reconstruct_missing_part": "google/gemini-3.1-flash-image",
+    # Nano Banana 2 Lite is OpenRouter's fastest/cost-efficient Gemini image
+    # route. Nitro prioritizes the fastest available provider endpoint.
+    "enhance_artwork": "google/gemini-3.1-flash-lite-image:nitro",
+    "create_pattern_mockup": "google/gemini-3.1-flash-lite-image:nitro",
+    "reconstruct_missing_part": "google/gemini-3.1-flash-lite-image:nitro",
 }
 
 FALLBACK_MODELS = {
-    # Keep fallback inside the Gemini 3.1 Flash family.
-    "analyze_artwork": "google/gemini-3.1-flash-lite-preview",
-    "identify_parts": "google/gemini-3.1-flash-lite-preview",
-    "verify_pattern_mockup": "google/gemini-3.1-flash-lite-preview",
-    "explain_error": "google/gemini-3.1-flash-lite-preview",
-    "enhance_artwork": "google/gemini-3.1-flash-lite-image",
-    "create_pattern_mockup": "google/gemini-3.1-flash-lite-image",
-    "reconstruct_missing_part": "google/gemini-3.1-flash-lite-image",
+    # Use a newer Flash Lite generation only when the GA 3.1 route fails.
+    "analyze_artwork": "google/gemini-3.5-flash-lite",
+    "identify_parts": "google/gemini-3.5-flash-lite",
+    "verify_pattern_mockup": "google/gemini-3.5-flash-lite",
+    "explain_error": "google/gemini-3.5-flash-lite",
+    # Image fallback trades some cost for quality/reliability and is rarely used.
+    "enhance_artwork": "google/gemini-3.1-flash-image:nitro",
+    "create_pattern_mockup": "google/gemini-3.1-flash-image:nitro",
+    "reconstruct_missing_part": "google/gemini-3.1-flash-image:nitro",
 }
 
 ENV_FIELDS = {
