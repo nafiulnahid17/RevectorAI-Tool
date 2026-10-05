@@ -7,6 +7,9 @@ from PIL import Image
 from app.pipeline.segmentation import detect_masks
 
 
+MATCHING_VERSION = "candidate-boundary-match/2.0"
+
+
 def _pixel_bbox(candidate: dict, width: int, height: int) -> tuple[int, int, int, int]:
     x, y, w, h = candidate["candidate_bbox"]
     left = max(0, min(width - 1, int(round(x * width))))
