@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from app.ai.adapters import OpenRouterProvider
+from app.ai.image_quality import preset_target_dimensions
 from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
 from app.ai.quota import FallbackQuota
 from app.ai.router import AIRouter
@@ -44,10 +45,12 @@ class FlakyStructuredProvider(GoodProvider):
 def test_one_key_profile_resolves_all_operation_models():
     router = AIRouter(AISettings(openrouter_api_key="sk-or-test"))
     models = router.operation_models()
-    assert models["analyze_artwork"]["primary"] == "openai/gpt-6-astra"
-    assert models["create_pattern_mockup"]["primary"] == "openai/gpt-image-2.5-sunburst"
-    assert models["verify_pattern_mockup"]["primary"] == "google/gemini-3.1-pro-preview"
-    assert models["explain_error"]["primary"] == "google/gemini-3.8-flash"
+    assert models["analyze_artwork"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["identify_parts"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-image"
+    assert models["verify_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["explain_error"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-lite-image"
     assert router.configured() and router.fallback_configured()
 
 
@@ -58,7 +61,7 @@ def test_operation_override_does_not_change_other_routes():
     )
     models = AIRouter(settings).operation_models()
     assert models["analyze_artwork"]["primary"] == "vendor/custom-analyzer"
-    assert models["identify_parts"]["primary"] == "openai/gpt-6-astra"
+    assert models["identify_parts"]["primary"] == "google/gemini-3.1-flash-lite"
 
 
 def test_openrouter_uses_dedicated_image_api_with_reference():
@@ -69,7 +72,7 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
     def respond(request):
         assert request.url.path.endswith("/images")
         payload = json.loads(request.content)
-        assert payload["model"] == "openai/gpt-image-2.5-sunburst"
+        assert payload["model"] == "google/gemini-3.1-flash-image"
         assert payload["aspect_ratio"] == "4:3"
         assert payload["resolution"] == "1K"
         assert payload["input_references"][0]["image_url"]["url"].startswith(
@@ -89,8 +92,8 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "openai/gpt-image-2.5-sunburst",
-        "openai/gpt-image-2.5-sunburst",
+        "google/gemini-3.1-flash-image",
+        "google/gemini-3.1-flash-image",
         transport=httpx.MockTransport(respond),
     )
     result = provider.create_pattern_mockup(image, "command", (1440, 1080))
@@ -173,3 +176,12 @@ def test_master_mockup_command_is_versioned_and_canonical():
     assert "CUT THE COLLAR COMPLETELY OUT OF BOTH BODY PANELS." in MASTER_MOCKUP_COMMAND
     assert "TOTAL = 8 SEPARATED COMPONENTS." in MASTER_MOCKUP_COMMAND
     assert "uploaded Original Image and its Enhanced Image" in MASTER_MOCKUP_COMMAND
+
+
+def test_workspace_presets_control_ai_raster_targets():
+    assert preset_target_dimensions("BALANCED", "4:3") == (960, 720)
+    assert preset_target_dimensions("FAST", "4:3") == (1440, 1080)
+    assert preset_target_dimensions("ULTRA", "4:3") == (1920, 1440)
+    assert preset_target_dimensions("BALANCED", "1:1") == (720, 720)
+    assert preset_target_dimensions("FAST", "1:1") == (1080, 1080)
+    assert preset_target_dimensions("ULTRA", "1:1") == (1440, 1440)
