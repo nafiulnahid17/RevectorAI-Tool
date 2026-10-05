@@ -301,7 +301,6 @@ class OpenRouterProvider(CompatibleRESTProvider):
                     "allow_fallbacks": True,
                     "sort": "latency",
                 },
-                "reasoning": {"effort": "minimal"},
             },
         )
         self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
@@ -428,21 +427,24 @@ class OpenRouterProvider(CompatibleRESTProvider):
             "data:image/png;base64,"
             + base64.b64encode(image_bytes(image, 2048)).decode()
         )
-        result = self.request(
-            "/images",
-            json={
-                "model": self.image_model,
-                "prompt": prompt,
-                "aspect_ratio": nearest_supported_ratio(size),
-                "resolution": nearest_openrouter_resolution(size),
-                "input_references": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": reference},
-                    }
-                ],
-            },
-        )
+        payload = {
+            "model": self.image_model,
+            "prompt": prompt,
+            "aspect_ratio": nearest_supported_ratio(size),
+            "output_format": "png",
+            "input_references": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": reference},
+                }
+            ],
+        }
+        # FLUX.2 Klein chooses its own native pixel dimensions. OpenRouter's
+        # image-model capability descriptor does not expose a resolution field.
+        # Other image models may accept a normalized resolution tier.
+        if self.image_model != "black-forest-labs/flux.2-klein-4b":
+            payload["resolution"] = nearest_openrouter_resolution(size)
+        result = self.request("/images", json=payload)
         self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
         try:
             return decode_image(result["data"][0]["b64_json"])
