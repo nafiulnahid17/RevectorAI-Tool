@@ -258,6 +258,12 @@ class CompatibleRESTProvider(HTTPProvider):
 class OpenRouterProvider(CompatibleRESTProvider):
     """OpenRouter text/vision plus the dedicated unified Image API."""
 
+    def _completion_parameters(self) -> dict:
+        """Use only generation controls the selected OpenRouter model supports."""
+        if self.model.startswith(("openai/gpt-5", "openai/gpt-6")):
+            return {"max_completion_tokens": 2500}
+        return {"max_tokens": 2500, "temperature": 0}
+
     def structured_text(
         self,
         prompt: str,
@@ -286,8 +292,7 @@ class OpenRouterProvider(CompatibleRESTProvider):
             json={
                 "model": self.model,
                 "messages": [{"role": "user", "content": content}],
-                "max_tokens": 2500,
-                "temperature": 0,
+                **self._completion_parameters(),
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
