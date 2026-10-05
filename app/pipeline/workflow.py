@@ -7,14 +7,33 @@ from PIL import Image
 
 from app.ai.contracts import SLOTS, PartSlot
 from app.ai.prompts import MOCKUP_VERSION, mockup_runtime_prompt
-from app.ai.image_quality import target_dimensions
+from app.ai.image_quality import preset_quality_label, preset_target_dimensions
 from app.core.exceptions import EngineError
 from app.errors.normalization import normalize
 from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
 
 
-PREPARE_VERSION = "prepare/2.1"
+PREPARE_VERSION = "prepare/2.2"
+
+
+def _normalize_generated_size(
+    image: Image.Image, target: tuple[int, int]
+) -> Image.Image:
+    """Store predictable preset-sized rasters after provider generation.
+
+    Providers choose their own native pixel dimensions. ReVector requests the
+    nearest OpenRouter resolution tier, then normalizes a correctly shaped
+    result to the user-selected workspace target without inventing geometry.
+    """
+    target_width, target_height = target
+    current_ratio = image.width / max(image.height, 1)
+    target_ratio = target_width / max(target_height, 1)
+    if abs(current_ratio / target_ratio - 1) > 0.05:
+        return image
+    if image.size == target:
+        return image
+    return image.resize(target, Image.Resampling.LANCZOS)
 
 
 def _reference_sheet(images: list[Image.Image]) -> Image.Image:
@@ -74,10 +93,12 @@ class ProductionWorkflow:
     def prepare(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:
         e = self.engine
         p = e.load(pid)
-        mockup_size = target_dimensions(p.settings.image_quality, "4:3")
+        mockup_size = preset_target_dimensions(p.settings.preset, "4:3")
+        quality_label = preset_quality_label(p.settings.preset)
         signature = (
             p.source_hash,
-            p.settings.image_quality,
+            p.settings.preset,
+            quality_label,
             p.settings.mockup_background,
             list(mockup_size),
             p.settings.ai_workflow,
@@ -120,8 +141,10 @@ class ProductionWorkflow:
             enhanced, enhancement_meta = e.ai_router.invoke(
                 "enhance_artwork", original, mockup_size
             )
+            enhanced = _normalize_generated_size(enhanced, mockup_size)
             enhancement_meta.update(
-                requested_quality=p.settings.image_quality,
+                requested_quality=quality_label,
+                workspace_preset=p.settings.preset,
                 requested_dimensions=list(mockup_size),
                 actual_dimensions=list(enhanced.size),
             )
@@ -135,20 +158,22 @@ class ProductionWorkflow:
             references = _reference_sheet([original, enhanced])
             prompt = mockup_runtime_prompt(
                 p.settings.mockup_background,
-                p.settings.image_quality,
+                quality_label,
                 mockup_size,
                 analysis,
             )
             mockup, mockup_meta = e.ai_router.invoke(
                 "create_pattern_mockup", references, prompt, mockup_size
             )
+            mockup = _normalize_generated_size(mockup, mockup_size)
             mockup_meta.update(
                 mockup_generated=True,
                 prompt_version=MOCKUP_VERSION,
                 expected_parts=list(SLOTS),
                 source_hash=p.source_hash,
                 design_sources=["original", "enhancement"],
-                requested_quality=p.settings.image_quality,
+                requested_quality=quality_label,
+                workspace_preset=p.settings.preset,
                 requested_dimensions=list(mockup_size),
                 actual_dimensions=list(mockup.size),
                 selected_background=p.settings.mockup_background,
@@ -470,11 +495,19 @@ class ProductionWorkflow:
             )
         self.event(pid, "RECONSTRUCTING_PART", slot=name)
         prompt = f"Reconstruct only {name} as one detached flat jersey component on {p.settings.mockup_background} background. Preserve observed colors and branding from this reference. Do not invent unknown logos, text or numbers. Unseen artwork is an inferred proposal requiring review. No other pieces."
+        missing_size = preset_target_dimensions(p.settings.preset, "1:1")
         image, meta = e.ai_router.invoke(
             "reconstruct_missing_part",
             e.image(p.ai_assets.get("mockup") or p.working_image),
             prompt,
-            target_dimensions(p.settings.image_quality, "1:1"),
+            missing_size,
+        )
+        image = _normalize_generated_size(image, missing_size)
+        meta.update(
+            requested_quality=preset_quality_label(p.settings.preset),
+            workspace_preset=p.settings.preset,
+            requested_dimensions=list(missing_size),
+            actual_dimensions=list(image.size),
         )
         self.save_ai(pid, "missing-" + name.lower(), image, meta)
         masks, segmeta = segmentation.detect_masks(image, 0.001)
