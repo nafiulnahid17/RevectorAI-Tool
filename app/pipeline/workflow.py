@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from app.ai.contracts import SLOTS, PartSlot
-from app.ai.prompts import MOCKUP_VERSION, mockup_runtime_prompt
+from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
 from app.ai.image_quality import preset_quality_label, preset_target_dimensions
 from app.core.exceptions import EngineError
 from app.errors.normalization import normalize
@@ -14,7 +14,7 @@ from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
 
 
-PREPARE_VERSION = "prepare/2.2"
+PREPARE_VERSION = "prepare/2.3-stable-699ac010"
 
 
 def _normalize_generated_size(
@@ -93,14 +93,11 @@ class ProductionWorkflow:
     def prepare(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:
         e = self.engine
         p = e.load(pid)
-        mockup_size = preset_target_dimensions(p.settings.preset, "4:3")
-        quality_label = preset_quality_label(p.settings.preset)
+        mockup_size = (p.settings.mockup_width, p.settings.mockup_height)
         signature = (
             p.source_hash,
-            p.settings.preset,
-            quality_label,
-            p.settings.mockup_background,
-            list(mockup_size),
+            p.settings.mockup_width,
+            p.settings.mockup_height,
             p.settings.ai_workflow,
             e.ai_router.fingerprint(),
             MOCKUP_VERSION,
@@ -125,134 +122,64 @@ class ProductionWorkflow:
         e.run(pid, "analyze", job_id=params.get("_job_id"), cancelled=cancelled)
         p = e.load(pid)
 
+        # Stable 699ac010 preparation path:
+        # Original -> Analyze -> Enhance -> Enhanced-only Mockup -> Identify -> CV refine.
         if p.settings.ai_workflow and (
             e.ai_router.configured() or e.ai_router.configuration_errors
         ):
-            original = e.image(p.working_image)
-
-            if cancelled():
-                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
-            analysis, analysis_meta = e.ai_router.invoke("analyze_artwork", original)
-            self.save_ai(pid, "analysis", analysis, analysis_meta)
-
-            if cancelled():
-                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
-            self.event(pid, "ENHANCING_ARTWORK")
-            enhanced, enhancement_meta = e.ai_router.invoke(
-                "enhance_artwork", original, mockup_size
-            )
-            enhanced = _normalize_generated_size(enhanced, mockup_size)
-            enhancement_meta.update(
-                requested_quality=quality_label,
-                workspace_preset=p.settings.preset,
-                requested_dimensions=list(mockup_size),
-                actual_dimensions=list(enhanced.size),
-            )
-            self.save_ai(pid, "enhancement", enhanced, enhancement_meta)
-
-            if cancelled():
-                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
-            self.event(pid, "CREATING_PATTERN_MOCKUP")
-            p = e.load(pid)
-            enhanced = e.image(p.ai_assets["enhancement"])
-            references = _reference_sheet([original, enhanced])
-            prompt = mockup_runtime_prompt(
-                p.settings.mockup_background,
-                quality_label,
-                mockup_size,
-                analysis,
-            )
-            mockup, mockup_meta = e.ai_router.invoke(
-                "create_pattern_mockup", references, prompt, mockup_size
-            )
-            mockup = _normalize_generated_size(mockup, mockup_size)
-            mockup_meta.update(
-                mockup_generated=True,
-                prompt_version=MOCKUP_VERSION,
-                expected_parts=list(SLOTS),
-                source_hash=p.source_hash,
-                design_sources=["original", "enhancement"],
-                requested_quality=quality_label,
-                workspace_preset=p.settings.preset,
-                requested_dimensions=list(mockup_size),
-                actual_dimensions=list(mockup.size),
-                selected_background=p.settings.mockup_background,
-                inferred_surfaces_require_review=True,
-            )
-            self.save_ai(pid, "mockup", mockup, mockup_meta)
+            for operation, event, method in [
+                ("analysis", "ANALYZING_ARTWORK", "analyze_artwork"),
+                ("enhancement", "ENHANCING_ARTWORK", "enhance_artwork"),
+                ("mockup", "CREATING_PATTERN_MOCKUP", "create_pattern_mockup"),
+            ]:
+                if cancelled():
+                    raise EngineError("JOB_CANCELLED", "Preparation cancelled")
+                self.event(pid, event)
+                p = e.load(pid)
+                source = (
+                    p.ai_assets.get("enhancement")
+                    if operation == "mockup"
+                    else p.working_image
+                )
+                image = e.image(source)
+                size = mockup_size
+                args = (
+                    (image,)
+                    if operation == "analysis"
+                    else (image, MASTER_MOCKUP_COMMAND, size)
+                    if operation == "mockup"
+                    else (image, size)
+                )
+                value, meta = e.ai_router.invoke(method, *args)
+                if operation == "mockup":
+                    meta.update(
+                        mockup_generated=True,
+                        prompt_version=MOCKUP_VERSION,
+                        expected_parts=list(SLOTS),
+                        source_hash=p.source_hash,
+                        requested_dimensions=list(size),
+                        actual_dimensions=list(value.size),
+                        inferred_surfaces_require_review=True,
+                    )
+                self.save_ai(pid, operation, value, meta)
 
             p = e.load(pid)
             image = e.image(p.ai_assets["mockup"])
-            if min(image.size) < 512:
+            if max(image.size) < 1024:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "Mockup is below the minimum safe reference resolution",
+                    "Mockup is below the minimum reference resolution",
                 )
-            if abs((image.width / image.height) / (4 / 3) - 1) > 0.05:
+            requested = p.settings.mockup_width / p.settings.mockup_height
+            if abs(image.width / image.height / requested - 1) > 0.05:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "AI returned an unexpected aspect ratio. Mockup Creation requires 4:3 landscape.",
+                    "AI returned an unexpected aspect ratio. Change canvas settings or retry the provider.",
                 )
 
-            if e.ai_router.supports_operation("verify_pattern_mockup"):
-                if cancelled():
-                    raise EngineError("JOB_CANCELLED", "Preparation cancelled")
-                self.event(pid, "VERIFYING_PATTERN_MOCKUP")
-                qc_sheet = _reference_sheet([original, enhanced, image])
-                try:
-                    qc, qc_meta = e.ai_router.invoke("verify_pattern_mockup", qc_sheet)
-                    qc_meta.update(
-                        source_hash=p.source_hash,
-                        expected_parts=list(SLOTS),
-                        prompt_version=MOCKUP_VERSION,
-                    )
-                    self.save_ai(pid, "mockup_qc", qc, qc_meta)
-                    if qc["serious_failure"] or not qc["pass_qc"]:
-                        with e.storage.lock(pid):
-                            current = e.load(pid)
-                            current.warnings.append(
-                                "AI mockup surface review requires attention. Detect Parts remains available so deterministic boundaries and manual slot review can continue."
-                            )
-                            current.ai_metadata.setdefault("mockup_qc", {})[
-                                "review_required"
-                            ] = True
-                            e.storage.save(current)
-                except EngineError as exc:
-                    if exc.code == "JOB_CANCELLED":
-                        raise
-                    with e.storage.lock(pid):
-                        current = e.load(pid)
-                        current.warnings.append(
-                            "Independent AI mockup QC is temporarily unavailable. Detect Parts will continue with deterministic boundary detection and manual review."
-                        )
-                        current.ai_metadata["mockup_qc_unavailable"] = {
-                            "code": exc.code,
-                            "message": exc.message,
-                            "created_at": now(),
-                        }
-                        e.storage.save(current)
-
-            if cancelled():
-                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
             self.event(pid, "IDENTIFYING_PARTS")
-            try:
-                candidates, identify_meta = e.ai_router.invoke("identify_parts", image)
-                self.save_ai(pid, "identification", None, identify_meta)
-            except EngineError as exc:
-                if exc.code == "JOB_CANCELLED":
-                    raise
-                candidates = []
-                with e.storage.lock(pid):
-                    current = e.load(pid)
-                    current.warnings.append(
-                        "AI semantic part labels are temporarily unavailable. Deterministic boundaries were preserved for manual classification."
-                    )
-                    current.ai_metadata["identification_unavailable"] = {
-                        "code": exc.code,
-                        "message": exc.message,
-                        "created_at": now(),
-                    }
-                    e.storage.save(current)
+            candidates, identify_meta = e.ai_router.invoke("identify_parts", image)
+            self.save_ai(pid, "identification", None, identify_meta)
         else:
             image = e.image(p.working_image)
             candidates = []
