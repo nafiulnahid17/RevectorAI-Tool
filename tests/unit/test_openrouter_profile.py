@@ -50,7 +50,7 @@ def test_one_key_profile_resolves_all_operation_models():
     assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite-image:nitro"
     assert models["verify_pattern_mockup"]["primary"] == "openai/gpt-6-luna"
     assert models["explain_error"]["primary"] == "openai/gpt-6-luna"
-    assert models["analyze_artwork"]["fallback"] == "openai/gpt-6-luna"
+    assert models["analyze_artwork"]["fallback"] == "google/gemini-3.1-flash-lite"
     assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-image:nitro"
     assert router.configured() and router.fallback_configured()
 
