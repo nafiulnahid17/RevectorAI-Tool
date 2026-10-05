@@ -185,3 +185,48 @@ def test_workspace_presets_control_ai_raster_targets():
     assert preset_target_dimensions("BALANCED", "1:1") == (720, 720)
     assert preset_target_dimensions("FAST", "1:1") == (1080, 1080)
     assert preset_target_dimensions("ULTRA", "1:1") == (1440, 1440)
+
+
+def test_openrouter_structured_text_uses_json_schema():
+    def respond(request):
+        payload = json.loads(request.content)
+        assert request.url.path.endswith("/chat/completions")
+        assert payload["model"] == "google/gemini-3.1-flash-lite"
+        assert payload["response_format"]["type"] == "json_schema"
+        assert payload["response_format"]["json_schema"]["strict"] is True
+        assert payload["provider"]["require_parameters"] is True
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"value": "ok"})
+                        }
+                    }
+                ],
+                "usage": {"total_tokens": 3},
+            },
+        )
+
+    provider = OpenRouterProvider(
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        "sk-or-test",
+        "google/gemini-3.1-flash-lite",
+        "",
+        transport=httpx.MockTransport(respond),
+    )
+    result = provider.structured_text(
+        "Return the value.",
+        None,
+        {
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
+        schema_name="test_schema",
+    )
+    assert result == {"value": "ok"}
+    assert provider.last_usage["total_tokens"] == 3
