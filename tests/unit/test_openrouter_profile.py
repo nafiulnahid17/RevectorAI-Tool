@@ -8,7 +8,7 @@ import httpx
 import pytest
 from PIL import Image
 
-from app.ai.adapters import OpenRouterProvider
+from app.ai.adapters import OpenRouterProvider, sanitize_structured_schema
 from app.ai.image_quality import preset_target_dimensions
 from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
 from app.ai.quota import FallbackQuota
@@ -234,3 +234,37 @@ def test_openrouter_structured_text_uses_json_schema():
     )
     assert result == {"value": "ok"}
     assert provider.last_usage["total_tokens"] == 3
+
+
+def test_gemini_schema_sanitizer_drops_unsupported_pydantic_keywords():
+    schema = {
+        "type": "object",
+        "properties": {
+            "confidence": {
+                "anyOf": [{"type": "number"}, {"type": "null"}],
+                "default": None,
+                "minimum": 0,
+                "maximum": 1,
+            },
+            "notes": {
+                "type": "string",
+                "default": "",
+                "maxLength": 2000,
+            },
+            "box": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1,
+            },
+        },
+        "required": ["confidence", "notes", "box"],
+        "additionalProperties": False,
+    }
+    cleaned = sanitize_structured_schema(schema)
+    assert "default" not in cleaned["properties"]["confidence"]
+    assert "default" not in cleaned["properties"]["notes"]
+    assert "maxLength" not in cleaned["properties"]["notes"]
+    assert "exclusiveMinimum" not in cleaned["properties"]["box"]
+    assert cleaned["properties"]["confidence"]["minimum"] == 0
+    assert cleaned["properties"]["confidence"]["maximum"] == 1
+    assert cleaned["additionalProperties"] is False
