@@ -6,11 +6,31 @@ import numpy as np
 from PIL import Image
 
 from app.ai.contracts import SLOTS, PartSlot
-from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
+from app.ai.prompts import MOCKUP_VERSION, mockup_runtime_prompt
+from app.ai.image_quality import target_dimensions
 from app.core.exceptions import EngineError
 from app.errors.normalization import normalize
 from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
+
+
+def _reference_sheet(images: list[Image.Image]) -> Image.Image:
+    """Bounded visual evidence sheet. It never becomes a production artifact."""
+    cells = []
+    for image in images:
+        cell = image.convert("RGB").copy()
+        cell.thumbnail((900, 900))
+        cells.append(cell)
+    gap = 24
+    width = sum(cell.width for cell in cells) + gap * max(0, len(cells) - 1)
+    height = max(cell.height for cell in cells)
+    sheet = Image.new("RGB", (width, height), "black")
+    x = 0
+    for cell in cells:
+        y = (height - cell.height) // 2
+        sheet.paste(cell, (x, y))
+        x += cell.width + gap
+    return sheet
 
 
 class ProductionWorkflow:
@@ -44,17 +64,19 @@ class ProductionWorkflow:
             }
             p.usage["ai_calls"] += metadata["attempt_count"]
             p.usage["processing_ms"] += metadata.get("duration_ms", 0)
-            if operation == "analysis":
-                p.ai_metadata["analysis"]["result"] = value
+            if isinstance(value, dict):
+                p.ai_metadata[operation]["result"] = value
             self.engine.storage.save(p)
 
     def prepare(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:
         e = self.engine
         p = e.load(pid)
+        mockup_size = target_dimensions(p.settings.image_quality, "4:3")
         signature = (
             p.source_hash,
-            p.settings.mockup_width,
-            p.settings.mockup_height,
+            p.settings.image_quality,
+            p.settings.mockup_background,
+            list(mockup_size),
             p.settings.ai_workflow,
             e.ai_router.fingerprint(),
             MOCKUP_VERSION,
@@ -72,67 +94,105 @@ class ProductionWorkflow:
                 "status": "PART_REVIEW_READY",
                 "detected_parts": len(p.parts),
             }
+
         self.event(pid, "ANALYZING_ARTWORK")
         e.run(pid, "analyze", job_id=params.get("_job_id"), cancelled=cancelled)
         p = e.load(pid)
-        # No credentials means deterministic/manual operation, never a fake AI success.
+
         if p.settings.ai_workflow and (
             e.ai_router.configured() or e.ai_router.configuration_errors
         ):
-            for operation, event, method in [
-                ("analysis", "ANALYZING_ARTWORK", "analyze_artwork"),
-                ("enhancement", "ENHANCING_ARTWORK", "enhance_artwork"),
-                ("mockup", "CREATING_PATTERN_MOCKUP", "create_pattern_mockup"),
-            ]:
-                if cancelled():
-                    raise EngineError("JOB_CANCELLED", "Preparation cancelled")
-                self.event(pid, event)
-                p = e.load(pid)
-                source = (
-                    p.ai_assets.get("enhancement")
-                    if operation == "mockup"
-                    else p.working_image
-                )
-                image = e.image(source)
-                size = (p.settings.mockup_width, p.settings.mockup_height)
-                args = (
-                    (image,)
-                    if operation == "analysis"
-                    else (image, MASTER_MOCKUP_COMMAND, size)
-                    if operation == "mockup"
-                    else (image, size)
-                )
-                value, meta = e.ai_router.invoke(method, *args)
-                if operation == "mockup":
-                    meta.update(
-                        mockup_generated=True,
-                        prompt_version=MOCKUP_VERSION,
-                        expected_parts=list(SLOTS),
-                        source_hash=p.source_hash,
-                        requested_dimensions=list(size),
-                        actual_dimensions=list(value.size),
-                        inferred_surfaces_require_review=True,
-                    )
-                self.save_ai(pid, operation, value, meta)
+            original = e.image(p.working_image)
+
+            if cancelled():
+                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
+            analysis, analysis_meta = e.ai_router.invoke("analyze_artwork", original)
+            self.save_ai(pid, "analysis", analysis, analysis_meta)
+
+            if cancelled():
+                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
+            self.event(pid, "ENHANCING_ARTWORK")
+            enhanced, enhancement_meta = e.ai_router.invoke(
+                "enhance_artwork", original, mockup_size
+            )
+            enhancement_meta.update(
+                requested_quality=p.settings.image_quality,
+                requested_dimensions=list(mockup_size),
+                actual_dimensions=list(enhanced.size),
+            )
+            self.save_ai(pid, "enhancement", enhanced, enhancement_meta)
+
+            if cancelled():
+                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
+            self.event(pid, "CREATING_PATTERN_MOCKUP")
+            p = e.load(pid)
+            enhanced = e.image(p.ai_assets["enhancement"])
+            references = _reference_sheet([original, enhanced])
+            prompt = mockup_runtime_prompt(
+                p.settings.mockup_background,
+                p.settings.image_quality,
+                mockup_size,
+                analysis,
+            )
+            mockup, mockup_meta = e.ai_router.invoke(
+                "create_pattern_mockup", references, prompt, mockup_size
+            )
+            mockup_meta.update(
+                mockup_generated=True,
+                prompt_version=MOCKUP_VERSION,
+                expected_parts=list(SLOTS),
+                source_hash=p.source_hash,
+                design_sources=["original", "enhancement"],
+                requested_quality=p.settings.image_quality,
+                requested_dimensions=list(mockup_size),
+                actual_dimensions=list(mockup.size),
+                selected_background=p.settings.mockup_background,
+                inferred_surfaces_require_review=True,
+            )
+            self.save_ai(pid, "mockup", mockup, mockup_meta)
+
             p = e.load(pid)
             image = e.image(p.ai_assets["mockup"])
-            if max(image.size) < 1024:
+            if min(image.size) < 512:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "Mockup is below the minimum reference resolution",
+                    "Mockup is below the minimum safe reference resolution",
                 )
-            requested = p.settings.mockup_width / p.settings.mockup_height
-            if abs(image.width / image.height / requested - 1) > 0.05:
+            if abs((image.width / image.height) / (4 / 3) - 1) > 0.05:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "AI returned an unexpected aspect ratio. Change canvas settings or retry the provider.",
+                    "AI returned an unexpected aspect ratio. Mockup Creation requires 4:3 landscape.",
                 )
+
+            if e.ai_router.supports_operation("verify_pattern_mockup"):
+                if cancelled():
+                    raise EngineError("JOB_CANCELLED", "Preparation cancelled")
+                self.event(pid, "VERIFYING_PATTERN_MOCKUP")
+                qc_sheet = _reference_sheet([original, enhanced, image])
+                qc, qc_meta = e.ai_router.invoke("verify_pattern_mockup", qc_sheet)
+                qc_meta.update(
+                    source_hash=p.source_hash,
+                    expected_parts=list(SLOTS),
+                    prompt_version=MOCKUP_VERSION,
+                )
+                self.save_ai(pid, "mockup_qc", qc, qc_meta)
+                if qc["serious_failure"] or not qc["pass_qc"]:
+                    raise EngineError(
+                        "MOCKUP_QC_FAILED",
+                        "Generated production-layout reference failed independent QC; regenerate or review before Detect Parts",
+                        status=409,
+                        diagnostics={"qc": qc},
+                    )
+
+            if cancelled():
+                raise EngineError("JOB_CANCELLED", "Preparation cancelled")
             self.event(pid, "IDENTIFYING_PARTS")
-            candidates, meta = e.ai_router.invoke("identify_parts", image)
-            self.save_ai(pid, "identification", None, meta)
+            candidates, identify_meta = e.ai_router.invoke("identify_parts", image)
+            self.save_ai(pid, "identification", None, identify_meta)
         else:
             image = e.image(p.working_image)
             candidates = []
+
         if cancelled():
             raise EngineError("JOB_CANCELLED", "Preparation cancelled")
         self.event(pid, "REFINING_PART_BOUNDARIES")
@@ -147,43 +207,47 @@ class ProductionWorkflow:
             )
             _, p.geometry = geometry.correct(image, None, False)
             p.slots = {name: PartSlot(part_type=name) for name in SLOTS}
-            for a in assignments:
-                c = a["candidate"]
+            for assignment in assignments:
+                candidate = assignment["candidate"]
                 fields = {
-                    "polygon": a["polygon"],
+                    "polygon": assignment["polygon"],
                     "source": "engine_refined",
                     "name": "Unclassified component",
                 }
-                if c:
+                if candidate:
                     fields.update(
-                        type=c["part_type"].lower(),
-                        name=c["part_type"].replace("_", " ").title(),
-                        confidence=c["confidence"],
-                        ai_confidence=c["confidence"],
+                        type=candidate["part_type"].lower(),
+                        name=candidate["part_type"].replace("_", " ").title(),
+                        confidence=candidate["confidence"],
+                        ai_confidence=candidate["confidence"],
                     )
-                part = e._create_part(p, a["mask"], fields)
-                if c:
-                    slot = p.slots[c["part_type"]]
+                part = e._create_part(p, assignment["mask"], fields)
+                if candidate:
+                    slot = p.slots[candidate["part_type"]]
                     if slot.part_id:
                         slot.status = "uncertain"
                     else:
                         slot.part_id = part.part_id
-                        slot.status = "uncertain" if c["uncertain"] else "detected"
-                        slot.ai_confidence = c["confidence"]
-                        slot.candidate_bbox = list(c["candidate_bbox"])
-                    slot.notes.append(c["notes"])
+                        slot.status = (
+                            "uncertain" if candidate["uncertain"] else "detected"
+                        )
+                        slot.ai_confidence = candidate["confidence"]
+                        slot.candidate_bbox = list(candidate["candidate_bbox"])
+                    slot.notes.append(candidate["notes"])
                 p.parts.append(part)
-            p.warnings.append(
-                "AI reference fidelity is not certified. Review colors, branding, unseen surfaces and seam continuity before production."
-            ) if candidates else None
+
+            if candidates:
+                p.warnings.append(
+                    "AI reference fidelity is not certified. Review colors, branding, unseen surfaces and seam continuity before production."
+                )
             p.ai_metadata["detection"] = {
                 "expected_parts": list(SLOTS),
                 "detected_candidates": candidates,
                 "missing_parts": [
-                    k for k, v in p.slots.items() if v.status == "missing"
+                    key for key, value in p.slots.items() if value.status == "missing"
                 ],
                 "uncertain_parts": [
-                    k for k, v in p.slots.items() if v.status == "uncertain"
+                    key for key, value in p.slots.items() if value.status == "uncertain"
                 ],
                 "geometry_source": "opencv",
                 "source": "mockup" if p.ai_assets.get("mockup") else "original",
@@ -202,7 +266,7 @@ class ProductionWorkflow:
         return {
             "status": "PART_REVIEW_READY",
             "detected_parts": len(p.parts),
-            "slots": {k: v.model_dump() for k, v in p.slots.items()},
+            "slots": {key: value.model_dump() for key, value in p.slots.items()},
         }
 
     def review(self, pid, decisions):
@@ -366,12 +430,12 @@ class ProductionWorkflow:
                 status=409,
             )
         self.event(pid, "RECONSTRUCTING_PART", slot=name)
-        prompt = f"Reconstruct only {name} as one detached flat jersey component on pure black background. Preserve observed colors and branding from this reference. Do not invent unknown logos, text or numbers. Unseen artwork is an inferred proposal requiring review. No other pieces."
+        prompt = f"Reconstruct only {name} as one detached flat jersey component on {p.settings.mockup_background} background. Preserve observed colors and branding from this reference. Do not invent unknown logos, text or numbers. Unseen artwork is an inferred proposal requiring review. No other pieces."
         image, meta = e.ai_router.invoke(
             "reconstruct_missing_part",
             e.image(p.ai_assets.get("mockup") or p.working_image),
             prompt,
-            (1024, 1024),
+            target_dimensions(p.settings.image_quality, "1:1"),
         )
         self.save_ai(pid, "missing-" + name.lower(), image, meta)
         masks, segmeta = segmentation.detect_masks(image, 0.001)
@@ -481,7 +545,8 @@ class ProductionWorkflow:
                 )
                 exc.normalized["diagnostics"] = exc.diagnostics
                 p.usage["ai_calls"] += sum(
-                    "provider" in a for a in exc.diagnostics.get("attempts", [])
+                    bool(a.get("dispatched", "provider" in a))
+                    for a in exc.diagnostics.get("attempts", [])
                 )
                 p.error = exc.normalized
                 p.error_history.append(exc.normalized)

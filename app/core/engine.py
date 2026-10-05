@@ -10,7 +10,7 @@ from xml.etree import ElementTree as ET
 from defusedxml import ElementTree as SafeET
 import numpy as np
 from PIL import Image
-from app.core.config import Settings
+from app.core.config import Settings, AISettings
 from app.core.exceptions import EngineError
 from app.core.logging import log_event
 from app.models.project import Project, Part, ProcessingSettings, State, now
@@ -46,13 +46,23 @@ class Engine:
                  segmentation_provider=None, ocr_provider=None, ai_router=None, error_ai_router=None):
         self.settings = settings
         from app.ai.router import AIRouter
+        from app.ai.quota import FallbackQuota
         from app.pipeline.workflow import ProductionWorkflow
-        self.ai_router = ai_router or AIRouter()
-        self.error_ai_router = error_ai_router or AIRouter(error_mode=True)
-        self.workflow = ProductionWorkflow(self)
         if settings.storage_backend != "local":
             raise EngineError("NOT_IMPLEMENTED", "Automatic R2 project orchestration is not implemented; use the explicit R2Storage adapter")
         self.storage = LocalStorage(settings.data_dir)
+        ai_settings = AISettings()
+        self.fallback_quota = FallbackQuota(
+            self.storage.root / "_system" / "fallback-ai.sqlite3",
+            ai_settings.fallback_max_calls,
+            ai_settings.fallback_window_hours,
+            ai_settings.fallback_limit_scope,
+        )
+        self.ai_router = ai_router or AIRouter(ai_settings, quota=self.fallback_quota)
+        self.error_ai_router = error_ai_router or AIRouter(
+            ai_settings, error_mode=True, quota=self.fallback_quota
+        )
+        self.workflow = ProductionWorkflow(self)
         self.vision_provider = vision_provider
         self.reconstruction_provider = reconstruction_provider
         self.segmentation_provider = segmentation_provider

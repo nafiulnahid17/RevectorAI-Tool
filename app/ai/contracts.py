@@ -58,6 +58,26 @@ class ArtworkAnalysis(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class MockupQC(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    pass_qc: bool = False
+    serious_failure: bool = False
+    component_count: int = Field(0, ge=0, le=32)
+    missing_parts: list[SlotType] = Field(default_factory=list)
+    duplicate_parts: list[SlotType] = Field(default_factory=list)
+    extra_components: list[str] = Field(default_factory=list, max_length=32)
+    attached_collar: bool = False
+    attached_sleeve: bool = False
+    left_right_mixup: bool = False
+    logo_or_crest_drift: bool = False
+    sponsor_or_text_drift: bool = False
+    name_or_number_drift: bool = False
+    color_drift: bool = False
+    pattern_loss: bool = False
+    invented_branding: bool = False
+    notes: list[str] = Field(default_factory=list, max_length=64)
+
+
 class PartSlot(BaseModel):
     part_type: SlotType
     status: Literal[
@@ -85,6 +105,7 @@ class AIProvider(Protocol):
     def create_pattern_mockup(
         self, image: Image.Image, prompt: str, size: tuple[int, int]
     ) -> Image.Image: ...
+    def verify_pattern_mockup(self, image: Image.Image) -> dict: ...
     def identify_parts(self, image: Image.Image) -> list[dict]: ...
     def reconstruct_missing_part(
         self, image: Image.Image, prompt: str, size: tuple[int, int]

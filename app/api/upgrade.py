@@ -75,16 +75,33 @@ def submit(stage, body, request):
 @router.get("/capabilities/ai")
 def ai_capabilities(request: Request):
     e = request.app.state.engine
+    quota = e.ai_router.quota_status()
+    primary_configured = bool(
+        getattr(e.ai_router, "_dynamic_openrouter", False)
+        or e.ai_router.primary is not None
+    )
     return {
-        "primary_configured": e.ai_router.primary is not None,
-        "fallback_configured": e.ai_router.fallback is not None,
+        "primary_configured": primary_configured,
+        "fallback_configured": e.ai_router.fallback_configured(),
+        "main_ai": {"configured": primary_configured},
+        "fallback_ai": {
+            "configured": e.ai_router.fallback_configured(),
+            "quota": quota,
+        },
         "error_assistant_configured": e.error_ai_router.configured(),
+        "provider_profile": (
+            "openrouter-one-key"
+            if getattr(e.ai_router, "_dynamic_openrouter", False)
+            else "legacy"
+        ),
+        "operation_models": e.ai_router.operation_models(),
         "connection_verified": False,
-        "configuration_errors": [v["code"] for v in e.ai_router.configuration_errors],
+        "configuration_errors": [
+            value["code"] for value in e.ai_router.configuration_errors
+        ],
         "native_ai_export": False,
         "note": "Configuration availability is not a successful provider request.",
     }
-
 
 @router.get("/error-catalog")
 def error_catalog():
