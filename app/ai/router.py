@@ -23,6 +23,14 @@ from app.core.config import AISettings
 from app.core.exceptions import EngineError
 
 
+PRIMARY_RETRY_OPERATIONS = frozenset(
+    {"analyze_artwork", "identify_parts", "verify_pattern_mockup", "explain_error"}
+)
+PRIMARY_RETRYABLE_CODES = frozenset(
+    {"AI_RESPONSE_INVALID", "AI_PROVIDER_ERROR", "AI_TIMEOUT"}
+)
+
+
 def make_provider(name, key, base, model, image_model, settings, transport=None):
     if not name:
         return None
@@ -279,6 +287,7 @@ class AIRouter:
                 if not fallback_mode:
                     primary_failed = True
                 continue
+
             if provider is None or not callable(getattr(provider, operation, None)):
                 if not fallback_mode:
                     primary_failed = True
@@ -287,6 +296,24 @@ class AIRouter:
             quota_state = None
             direct_quota_reservation = False
             if fallback_mode and self.quota:
+                quota_state = self.quota.status()
+                if quota_state.get("remaining", 0) <= 0:
+                    fallback_blocked = True
+                    attempts.append(
+                        {
+                            "provider": provider.name,
+                            "model": getattr(
+                                provider,
+                                "image_model"
+                                if is_image_operation(operation)
+                                else "model",
+                                None,
+                            ),
+                            "code": "FALLBACK_DAILY_LIMIT_REACHED",
+                            "dispatched": False,
+                        }
+                    )
+                    break
                 if hasattr(provider, "dispatch_hook"):
                     provider.dispatch_hook = self.quota.reserve
                     provider.last_quota_state = None
@@ -312,71 +339,110 @@ class AIRouter:
                         )
                         break
 
-            try:
-                actual_attempts += 1
-                value = getattr(provider, operation)(*args)
-                if fallback_mode and self.quota and not direct_quota_reservation:
-                    quota_state = getattr(provider, "last_quota_state", None)
-                value = self._validate(operation, value)
-                model = getattr(
-                    provider,
-                    "image_model" if is_image_operation(operation) else "model",
-                    None,
-                )
-                return value, {
-                    "processing_mode": mode,
-                    "provider": provider.name,
-                    "model": model,
-                    "operation": operation,
-                    "attempt_count": actual_attempts,
-                    "duration_ms": round(
-                        (time.perf_counter() - started) * 1000, 3
-                    ),
-                    "failures": attempts,
-                    "fallback_quota": (
-                        quota_state if fallback_mode else self.quota_status()
-                    ),
-                    "provider_usage": getattr(provider, "last_usage", {}),
-                }
-            except Exception as exc:  # provider boundary must normalize failures
-                code = (
-                    exc.code if isinstance(exc, EngineError) else "AI_RESPONSE_INVALID"
-                )
-                dispatched = True
-                if fallback_mode and self.quota and hasattr(provider, "last_quota_state"):
-                    dispatched = getattr(provider, "last_quota_state", None) is not None
-                attempts.append(
-                    {
+            max_provider_attempts = (
+                2
+                if not fallback_mode and operation in PRIMARY_RETRY_OPERATIONS
+                else 1
+            )
+
+            provider_succeeded = False
+            for provider_attempt in range(1, max_provider_attempts + 1):
+                try:
+                    if hasattr(provider, "last_usage"):
+                        provider.last_usage = {}
+                    actual_attempts += 1
+                    value = getattr(provider, operation)(*args)
+                    if fallback_mode and self.quota and not direct_quota_reservation:
+                        quota_state = getattr(provider, "last_quota_state", None)
+                    value = self._validate(operation, value)
+                    model = getattr(
+                        provider,
+                        "image_model"
+                        if is_image_operation(operation)
+                        else "model",
+                        None,
+                    )
+                    provider_succeeded = True
+                    return value, {
+                        "processing_mode": mode,
                         "provider": provider.name,
-                        "model": getattr(
-                            provider,
-                            "image_model"
-                            if is_image_operation(operation)
-                            else "model",
-                            None,
+                        "model": model,
+                        "operation": operation,
+                        "attempt_count": actual_attempts,
+                        "duration_ms": round(
+                            (time.perf_counter() - started) * 1000, 3
                         ),
-                        "code": code,
-                        "dispatched": dispatched,
+                        "failures": attempts,
+                        "fallback_quota": (
+                            quota_state if fallback_mode else self.quota_status()
+                        ),
+                        "provider_usage": getattr(provider, "last_usage", {}),
                     }
-                )
-                if not fallback_mode:
-                    primary_failed = True
-                elif code == "FALLBACK_DAILY_LIMIT_REACHED":
-                    fallback_blocked = True
+                except Exception as exc:  # provider boundary must normalize failures
+                    code = (
+                        exc.code
+                        if isinstance(exc, EngineError)
+                        else "AI_RESPONSE_INVALID"
+                    )
+                    dispatched = True
+                    if (
+                        fallback_mode
+                        and self.quota
+                        and hasattr(provider, "last_quota_state")
+                    ):
+                        dispatched = (
+                            getattr(provider, "last_quota_state", None) is not None
+                        )
+
+                    retry_scheduled = (
+                        not fallback_mode
+                        and provider_attempt < max_provider_attempts
+                        and code in PRIMARY_RETRYABLE_CODES
+                    )
+                    attempts.append(
+                        {
+                            "provider": provider.name,
+                            "model": getattr(
+                                provider,
+                                "image_model"
+                                if is_image_operation(operation)
+                                else "model",
+                                None,
+                            ),
+                            "code": code,
+                            "dispatched": dispatched,
+                            "provider_attempt": provider_attempt,
+                            "retry_scheduled": retry_scheduled,
+                        }
+                    )
+
+                    if retry_scheduled:
+                        continue
+
+                    if not fallback_mode:
+                        primary_failed = True
+                    elif code == "FALLBACK_DAILY_LIMIT_REACHED":
+                        fallback_blocked = True
                     break
+
+            if provider_succeeded:
+                break
 
         diagnostics = {"attempts": attempts}
         if self.quota:
             diagnostics["fallback_quota"] = self.quota_status()
+
         if primary_failed and fallback_blocked:
             raise EngineError(
-                "TOOL_LOCKED_AI_UNAVAILABLE",
-                "Primary AI could not complete the operation and fallback capacity is unavailable",
+                "AI_PROVIDER_UNAVAILABLE",
+                "Primary AI could not complete the operation and fallback capacity is temporarily unavailable. Retry the operation.",
                 status=503,
                 diagnostics=diagnostics,
             )
+
         raise EngineError(
             "AI_PROVIDER_UNAVAILABLE",
-            "No AI provider completed the request; review server-side provider configuration",
+            "No AI provider completed the request; retry or review server-side provider configuration",
+            status=503,
             diagnostics=diagnostics,
         )
