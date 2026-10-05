@@ -45,15 +45,19 @@ class FlakyStructuredProvider(GoodProvider):
 def test_one_key_profile_resolves_all_operation_models():
     router = AIRouter(AISettings(openrouter_api_key="sk-or-test"))
     models = router.operation_models()
-    assert models["analyze_artwork"]["primary"] == "meta-llama/llama-4-scout"
-    assert models["identify_parts"]["primary"] == "meta-llama/llama-4-scout"
-    assert models["create_pattern_mockup"]["primary"] == "black-forest-labs/flux.2-klein-4b"
-    assert models["verify_pattern_mockup"]["primary"] == "meta-llama/llama-4-scout"
-    assert models["explain_error"]["primary"] == "meta-llama/llama-4-scout"
-    assert models["analyze_artwork"]["fallback"] == ""
-    assert models["create_pattern_mockup"]["fallback"] == ""
+    assert models["analyze_artwork"]["primary"] == "openai/gpt-5.6-terra"
+    assert models["identify_parts"]["primary"] == "openai/gpt-5.6-terra"
+    assert models["verify_pattern_mockup"]["primary"] == "openai/gpt-5.6-terra"
+    assert models["explain_error"]["primary"] == "openai/gpt-5.6-luna"
+    assert models["enhance_artwork"]["primary"] == "openai/gpt-image-2.5-flare"
+    assert models["create_pattern_mockup"]["primary"] == "openai/gpt-image-2.5-flare"
+    assert models["reconstruct_missing_part"]["primary"] == "openai/gpt-image-2.5-sunburst"
+    assert models["analyze_artwork"]["fallback"] == "google/gemini-3.8-flash"
+    assert models["identify_parts"]["fallback"] == "google/gemini-3.8-flash"
+    assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3-pro-image"
+    assert models["reconstruct_missing_part"]["fallback"] == "google/gemini-3-pro-image"
     assert router.configured()
-    assert router.fallback_configured() is False
+    assert router.fallback_configured() is True
 
 
 def test_operation_override_does_not_change_other_routes():
@@ -63,7 +67,7 @@ def test_operation_override_does_not_change_other_routes():
     )
     models = AIRouter(settings).operation_models()
     assert models["analyze_artwork"]["primary"] == "vendor/custom-analyzer"
-    assert models["identify_parts"]["primary"] == "meta-llama/llama-4-scout"
+    assert models["identify_parts"]["primary"] == "openai/gpt-5.6-terra"
 
 
 def test_openrouter_uses_dedicated_image_api_with_reference():
@@ -74,10 +78,10 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
     def respond(request):
         assert request.url.path.endswith("/images")
         payload = json.loads(request.content)
-        assert payload["model"] == "black-forest-labs/flux.2-klein-4b"
+        assert payload["model"] == "openai/gpt-image-2.5-flare"
         assert payload["aspect_ratio"] == "4:3"
         assert payload["output_format"] == "png"
-        assert "resolution" not in payload
+        assert payload["resolution"] == "2K"
         assert payload["input_references"][0]["image_url"]["url"].startswith(
             "data:image/png;base64,"
         )
@@ -95,8 +99,8 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "black-forest-labs/flux.2-klein-4b",
-        "black-forest-labs/flux.2-klein-4b",
+        "openai/gpt-image-2.5-flare",
+        "openai/gpt-image-2.5-flare",
         transport=httpx.MockTransport(respond),
     )
     result = provider.create_pattern_mockup(image, "command", (1440, 1080))
@@ -194,7 +198,7 @@ def test_openrouter_structured_text_uses_json_schema():
     def respond(request):
         payload = json.loads(request.content)
         assert request.url.path.endswith("/chat/completions")
-        assert payload["model"] == "meta-llama/llama-4-scout"
+        assert payload["model"] == "openai/gpt-5.6-terra"
         assert payload["response_format"]["type"] == "json_schema"
         assert payload["response_format"]["json_schema"]["strict"] is True
         assert payload["provider"]["require_parameters"] is True
@@ -220,7 +224,7 @@ def test_openrouter_structured_text_uses_json_schema():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "meta-llama/llama-4-scout",
+        "openai/gpt-5.6-terra",
         "",
         transport=httpx.MockTransport(respond),
     )
