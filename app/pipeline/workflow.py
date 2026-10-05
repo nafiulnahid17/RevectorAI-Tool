@@ -14,6 +14,9 @@ from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
 
 
+PREPARE_VERSION = "prepare/2.1"
+
+
 def _reference_sheet(images: list[Image.Image]) -> Image.Image:
     """Bounded visual evidence sheet. It never becomes a production artifact."""
     cells = []
@@ -81,6 +84,7 @@ class ProductionWorkflow:
             e.ai_router.fingerprint(),
             MOCKUP_VERSION,
             hybrid_detection.MATCHING_VERSION,
+            PREPARE_VERSION,
         )
         if (
             p.ai_metadata.get("prepare_signature") == list(signature)
@@ -170,26 +174,60 @@ class ProductionWorkflow:
                     raise EngineError("JOB_CANCELLED", "Preparation cancelled")
                 self.event(pid, "VERIFYING_PATTERN_MOCKUP")
                 qc_sheet = _reference_sheet([original, enhanced, image])
-                qc, qc_meta = e.ai_router.invoke("verify_pattern_mockup", qc_sheet)
-                qc_meta.update(
-                    source_hash=p.source_hash,
-                    expected_parts=list(SLOTS),
-                    prompt_version=MOCKUP_VERSION,
-                )
-                self.save_ai(pid, "mockup_qc", qc, qc_meta)
-                if qc["serious_failure"] or not qc["pass_qc"]:
-                    raise EngineError(
-                        "MOCKUP_QC_FAILED",
-                        "Generated production-layout reference failed independent QC; regenerate or review before Detect Parts",
-                        status=409,
-                        diagnostics={"qc": qc},
+                try:
+                    qc, qc_meta = e.ai_router.invoke("verify_pattern_mockup", qc_sheet)
+                    qc_meta.update(
+                        source_hash=p.source_hash,
+                        expected_parts=list(SLOTS),
+                        prompt_version=MOCKUP_VERSION,
                     )
+                    self.save_ai(pid, "mockup_qc", qc, qc_meta)
+                    if qc["serious_failure"] or not qc["pass_qc"]:
+                        with e.storage.lock(pid):
+                            current = e.load(pid)
+                            current.warnings.append(
+                                "AI mockup surface review requires attention. Detect Parts remains available so deterministic boundaries and manual slot review can continue."
+                            )
+                            current.ai_metadata.setdefault("mockup_qc", {})[
+                                "review_required"
+                            ] = True
+                            e.storage.save(current)
+                except EngineError as exc:
+                    if exc.code == "JOB_CANCELLED":
+                        raise
+                    with e.storage.lock(pid):
+                        current = e.load(pid)
+                        current.warnings.append(
+                            "Independent AI mockup QC is temporarily unavailable. Detect Parts will continue with deterministic boundary detection and manual review."
+                        )
+                        current.ai_metadata["mockup_qc_unavailable"] = {
+                            "code": exc.code,
+                            "message": exc.message,
+                            "created_at": now(),
+                        }
+                        e.storage.save(current)
 
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Preparation cancelled")
             self.event(pid, "IDENTIFYING_PARTS")
-            candidates, identify_meta = e.ai_router.invoke("identify_parts", image)
-            self.save_ai(pid, "identification", None, identify_meta)
+            try:
+                candidates, identify_meta = e.ai_router.invoke("identify_parts", image)
+                self.save_ai(pid, "identification", None, identify_meta)
+            except EngineError as exc:
+                if exc.code == "JOB_CANCELLED":
+                    raise
+                candidates = []
+                with e.storage.lock(pid):
+                    current = e.load(pid)
+                    current.warnings.append(
+                        "AI semantic part labels are temporarily unavailable. Deterministic boundaries were preserved for manual classification."
+                    )
+                    current.ai_metadata["identification_unavailable"] = {
+                        "code": exc.code,
+                        "message": exc.message,
+                        "created_at": now(),
+                    }
+                    e.storage.save(current)
         else:
             image = e.image(p.working_image)
             candidates = []
@@ -257,7 +295,7 @@ class ProductionWorkflow:
             }
             if not candidates:
                 p.warnings.append(
-                    "AI is not configured: original source retained; manually classify exact CV/manual boundaries."
+                    "AI semantic labels were unavailable or inconclusive. Deterministic CV boundaries are preserved; manually classify the detected components."
                 )
             p.ai_metadata["prepare_signature"] = list(signature)
             p.ai_metadata["prepare_reference_sha256"] = e.file_hash(p.corrected_image)
