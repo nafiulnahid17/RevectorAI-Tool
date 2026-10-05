@@ -301,7 +301,7 @@ class OpenRouterProvider(CompatibleRESTProvider):
                     "allow_fallbacks": True,
                     "sort": "latency",
                 },
-                "plugins": [{"id": "response-healing"}],
+                "reasoning": {"effort": "minimal"},
             },
         )
         self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
