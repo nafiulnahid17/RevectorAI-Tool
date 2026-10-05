@@ -234,7 +234,12 @@ class AIRouter:
         return False
 
     def quota_status(self) -> dict | None:
-        return self.quota.status() if self.quota else None
+        # The legacy local fallback quota protects the old direct-provider
+        # fallback path. OpenRouter fallbacks use the same billed account and
+        # must remain available for production failover.
+        if self._dynamic_openrouter:
+            return None
+        return fallback_quota.status() if self.quota else None
 
     @staticmethod
     def _validate(operation: str, value):
@@ -278,6 +283,7 @@ class AIRouter:
         actual_attempts = 0
         primary_failed = False
         fallback_blocked = False
+        fallback_quota = None if self._dynamic_openrouter else self.quota
 
         for fallback_mode, mode in ((False, "primary_ai"), (True, "fallback_ai")):
             try:
@@ -295,8 +301,8 @@ class AIRouter:
 
             quota_state = None
             direct_quota_reservation = False
-            if fallback_mode and self.quota:
-                quota_state = self.quota.status()
+            if fallback_mode and fallback_quota:
+                quota_state = fallback_quota.status()
                 if quota_state.get("remaining", 0) <= 0:
                     fallback_blocked = True
                     attempts.append(
@@ -315,11 +321,11 @@ class AIRouter:
                     )
                     break
                 if hasattr(provider, "dispatch_hook"):
-                    provider.dispatch_hook = self.quota.reserve
+                    provider.dispatch_hook = fallback_quota.reserve
                     provider.last_quota_state = None
                 else:
                     try:
-                        quota_state = self.quota.reserve()
+                        quota_state = fallback_quota.reserve()
                         direct_quota_reservation = True
                     except EngineError as exc:
                         fallback_blocked = True
@@ -387,7 +393,7 @@ class AIRouter:
                     dispatched = True
                     if (
                         fallback_mode
-                        and self.quota
+                        and fallback_quota
                         and hasattr(provider, "last_quota_state")
                     ):
                         dispatched = (
@@ -429,7 +435,7 @@ class AIRouter:
                 break
 
         diagnostics = {"attempts": attempts}
-        if self.quota:
+        if fallback_quota:
             diagnostics["fallback_quota"] = self.quota_status()
 
         if primary_failed and fallback_blocked:
