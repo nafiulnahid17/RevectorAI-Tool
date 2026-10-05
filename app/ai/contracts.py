@@ -38,6 +38,22 @@ class Candidate(BaseModel):
     notes: str = Field("", max_length=2000)
 
 
+class LogoEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    label: str
+    location: str
+    confidence: float | None = Field(ge=0, le=1)
+    notes: str
+
+
+class TextRegionEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    text: str
+    location: str
+    confidence: float | None = Field(ge=0, le=1)
+    notes: str
+
+
 class ArtworkAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     artwork_type: str = "unknown"
@@ -46,8 +62,8 @@ class ArtworkAnalysis(BaseModel):
     missing_parts: list[SlotType] = Field(default_factory=list)
     uncertain_parts: list[SlotType] = Field(default_factory=list)
     dominant_colors: list[str] = Field(default_factory=list, max_length=64)
-    logos: list[dict] = Field(default_factory=list, max_length=100)
-    text_regions: list[dict] = Field(default_factory=list, max_length=100)
+    logos: list[LogoEvidence] = Field(default_factory=list, max_length=100)
+    text_regions: list[TextRegionEvidence] = Field(default_factory=list, max_length=100)
     names: list[str] = Field(default_factory=list)
     numbers: list[str] = Field(default_factory=list)
     sponsors: list[str] = Field(default_factory=list)
