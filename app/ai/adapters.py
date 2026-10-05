@@ -212,7 +212,6 @@ class CompatibleRESTProvider(HTTPProvider):
                 },
             ]
         )
-        schema = sanitize_structured_schema(schema)
         result = self.request(
             "/chat/completions",
             json={
@@ -281,6 +280,7 @@ class OpenRouterProvider(CompatibleRESTProvider):
                 },
             ]
         )
+        schema = sanitize_structured_schema(schema)
         result = self.request(
             "/chat/completions",
             json={
