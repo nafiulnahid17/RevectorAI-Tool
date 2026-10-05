@@ -262,7 +262,12 @@ class OpenRouterProvider(CompatibleRESTProvider):
                         "schema": schema,
                     },
                 },
-                "provider": {"require_parameters": True},
+                "provider": {
+                    "require_parameters": True,
+                    "allow_fallbacks": True,
+                    "sort": "latency",
+                },
+                "plugins": [{"id": "response-healing"}],
             },
         )
         self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
