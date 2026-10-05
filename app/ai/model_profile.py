@@ -17,29 +17,22 @@ IMAGE_OPERATIONS = frozenset({
 })
 
 DEFAULT_MODELS = {
-    # GPT-6 Luna is currently cheaper than Gemini 3.1 Flash Lite on OpenRouter,
-    # accepts image input, and has native JSON-Schema structured outputs.
-    "analyze_artwork": "openai/gpt-6-luna",
-    "identify_parts": "openai/gpt-6-luna",
-    "verify_pattern_mockup": "openai/gpt-6-luna",
-    "explain_error": "openai/gpt-6-luna",
-    # Nano Banana 2 Lite remains the fastest/cost-efficient image generation route.
-    "enhance_artwork": "google/gemini-3.1-flash-lite-image:nitro",
-    "create_pattern_mockup": "google/gemini-3.1-flash-lite-image:nitro",
-    "reconstruct_missing_part": "google/gemini-3.1-flash-lite-image:nitro",
+    # Stable 699ac010 capability model, now served through OpenRouter.
+    # Llama 4 Scout accepts image input and JSON-schema structured outputs.
+    "analyze_artwork": "meta-llama/llama-4-scout",
+    "identify_parts": "meta-llama/llama-4-scout",
+    "verify_pattern_mockup": "meta-llama/llama-4-scout",
+    "explain_error": "meta-llama/llama-4-scout",
+    # Stable 699ac010 image family, now served through OpenRouter's Image API.
+    "enhance_artwork": "black-forest-labs/flux.2-klein-4b",
+    "create_pattern_mockup": "black-forest-labs/flux.2-klein-4b",
+    "reconstruct_missing_part": "black-forest-labs/flux.2-klein-4b",
 }
 
-FALLBACK_MODELS = {
-    # Gemini stays as a cross-vendor structured-output fallback.
-    "analyze_artwork": "google/gemini-3.1-flash-lite",
-    "identify_parts": "google/gemini-3.1-flash-lite",
-    "verify_pattern_mockup": "google/gemini-3.1-flash-lite",
-    "explain_error": "google/gemini-3.1-flash-lite",
-    # Image fallback trades some cost for quality/reliability and is rarely used.
-    "enhance_artwork": "google/gemini-3.1-flash-image:nitro",
-    "create_pattern_mockup": "google/gemini-3.1-flash-image:nitro",
-    "reconstruct_missing_part": "google/gemini-3.1-flash-image:nitro",
-}
+# OpenRouter already performs provider-level failover for a selected model.
+# Keep local cross-model fallback disabled so a provider error cannot be masked
+# by an unrelated model or blocked by the legacy global fallback quota.
+FALLBACK_MODELS = {operation: "" for operation in OPERATIONS}
 
 ENV_FIELDS = {
     "analyze_artwork": "analyze_model",
