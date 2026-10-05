@@ -239,7 +239,7 @@ class AIRouter:
         # must remain available for production failover.
         if self._dynamic_openrouter:
             return None
-        return fallback_quota.status() if self.quota else None
+        return self.quota.status() if self.quota else None
 
     @staticmethod
     def _validate(operation: str, value):
@@ -358,7 +358,7 @@ class AIRouter:
                         provider.last_usage = {}
                     actual_attempts += 1
                     value = getattr(provider, operation)(*args)
-                    if fallback_mode and self.quota and not direct_quota_reservation:
+                    if fallback_mode and fallback_quota and not direct_quota_reservation:
                         quota_state = getattr(provider, "last_quota_state", None)
                     value = self._validate(operation, value)
                     model = getattr(
