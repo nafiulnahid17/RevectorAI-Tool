@@ -204,6 +204,9 @@ def test_openrouter_structured_text_uses_json_schema():
         assert payload["provider"]["require_parameters"] is True
         assert payload["provider"]["allow_fallbacks"] is True
         assert payload["provider"]["sort"] == "latency"
+        assert payload["max_completion_tokens"] == 2500
+        assert "max_tokens" not in payload
+        assert "temperature" not in payload
         assert "reasoning" not in payload
         assert "plugins" not in payload
         return httpx.Response(
@@ -241,6 +244,85 @@ def test_openrouter_structured_text_uses_json_schema():
     )
     assert result == {"value": "ok"}
     assert provider.last_usage["total_tokens"] == 3
+
+
+def test_openrouter_gemini_structured_text_uses_supported_completion_fields():
+    def respond(request):
+        payload = json.loads(request.content)
+        assert payload["model"] == "google/gemini-3.8-flash"
+        assert payload["max_tokens"] == 2500
+        assert payload["temperature"] == 0
+        assert "max_completion_tokens" not in payload
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": json.dumps({"value": "ok"})}}
+                ],
+                "usage": {"total_tokens": 3},
+            },
+        )
+
+    provider = OpenRouterProvider(
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        "sk-or-test",
+        "google/gemini-3.8-flash",
+        "",
+        transport=httpx.MockTransport(respond),
+    )
+    result = provider.structured_text(
+        "Return the value.",
+        None,
+        {
+            "type": "object",
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+            "additionalProperties": False,
+        },
+        schema_name="test_schema",
+    )
+    assert result == {"value": "ok"}
+
+
+def test_dynamic_openrouter_fallback_ignores_legacy_local_quota(tmp_path):
+    quota = FallbackQuota(tmp_path / "quota.sqlite3", 0, 24)
+
+    def respond(request):
+        payload = json.loads(request.content)
+        if payload["model"] == "openai/gpt-5.6-terra":
+            return httpx.Response(503, json={"error": {"message": "primary unavailable"}})
+        assert payload["model"] == "google/gemini-3.8-flash"
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps({"artwork_type": "jersey"})
+                        }
+                    }
+                ]
+            },
+        )
+
+    router = AIRouter(
+        AISettings(
+            openrouter_api_key="sk-or-test",
+            analyze_model="openai/gpt-5.6-terra",
+            analyze_fallback_model="google/gemini-3.8-flash",
+        ),
+        quota=quota,
+        transport=httpx.MockTransport(respond),
+    )
+    value, metadata = router.invoke(
+        "analyze_artwork", Image.new("RGB", (64, 64), "black")
+    )
+    assert value["artwork_type"] == "jersey"
+    assert metadata["processing_mode"] == "fallback_ai"
+    assert metadata["model"] == "google/gemini-3.8-flash"
+    assert metadata["fallback_quota"] is None
+    assert quota.status()["used"] == 0
 
 
 def test_gemini_schema_sanitizer_drops_unsupported_pydantic_keywords():
