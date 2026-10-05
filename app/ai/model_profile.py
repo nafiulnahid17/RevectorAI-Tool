@@ -17,23 +17,26 @@ IMAGE_OPERATIONS = frozenset({
 })
 
 DEFAULT_MODELS = {
-    "analyze_artwork": "openai/gpt-6-astra",
-    "identify_parts": "openai/gpt-6-astra",
-    "enhance_artwork": "openai/gpt-image-2.5-sunburst",
-    "create_pattern_mockup": "openai/gpt-image-2.5-sunburst",
-    "verify_pattern_mockup": "google/gemini-3.1-pro-preview",
-    "reconstruct_missing_part": "openai/gpt-image-2.5-sunburst",
-    "explain_error": "google/gemini-3.8-flash",
+    # OpenRouter's current GA low-latency Gemini 3.1 text/vision route.
+    "analyze_artwork": "google/gemini-3.1-flash-lite",
+    "identify_parts": "google/gemini-3.1-flash-lite",
+    "verify_pattern_mockup": "google/gemini-3.1-flash-lite",
+    "explain_error": "google/gemini-3.1-flash-lite",
+    # Gemini 3.1 Flash Image (Nano Banana 2) for all reference-image generation.
+    "enhance_artwork": "google/gemini-3.1-flash-image",
+    "create_pattern_mockup": "google/gemini-3.1-flash-image",
+    "reconstruct_missing_part": "google/gemini-3.1-flash-image",
 }
 
 FALLBACK_MODELS = {
-    "analyze_artwork": "google/gemini-3.8-flash",
-    "identify_parts": "google/gemini-3.8-flash",
-    "enhance_artwork": "openai/gpt-image-2.5-flare",
-    "create_pattern_mockup": "openai/gpt-image-2.5-flare",
-    "verify_pattern_mockup": "google/gemini-3.8-flash",
-    "reconstruct_missing_part": "openai/gpt-image-2.5-flare",
-    "explain_error": "google/gemini-3.1-pro-preview",
+    # Keep fallback inside the Gemini 3.1 Flash family.
+    "analyze_artwork": "google/gemini-3.1-flash-lite-preview",
+    "identify_parts": "google/gemini-3.1-flash-lite-preview",
+    "verify_pattern_mockup": "google/gemini-3.1-flash-lite-preview",
+    "explain_error": "google/gemini-3.1-flash-lite-preview",
+    "enhance_artwork": "google/gemini-3.1-flash-lite-image",
+    "create_pattern_mockup": "google/gemini-3.1-flash-lite-image",
+    "reconstruct_missing_part": "google/gemini-3.1-flash-lite-image",
 }
 
 ENV_FIELDS = {
