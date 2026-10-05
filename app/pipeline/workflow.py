@@ -483,7 +483,18 @@ class ProductionWorkflow:
             raise EngineError("JOB_CANCELLED", "Missing-part reconstruction cancelled")
         with e.storage.lock(pid):
             p = e.load(pid)
-            old = e.image(p.corrected_image)
+            base_key = (
+                p.corrected_image
+                or p.ai_assets.get("mockup")
+                or p.working_image
+            )
+            if not base_key:
+                raise EngineError(
+                    "STAGE_PREREQUISITE",
+                    "A real project reference is required before reconstructing a missing part.",
+                    status=409,
+                )
+            old = e.image(base_key)
             canvas = Image.new(
                 "RGBA",
                 (old.width + image.width + 32, max(old.height, image.height)),
