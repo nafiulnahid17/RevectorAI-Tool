@@ -47,10 +47,11 @@ def test_one_key_profile_resolves_all_operation_models():
     models = router.operation_models()
     assert models["analyze_artwork"]["primary"] == "google/gemini-3.1-flash-lite"
     assert models["identify_parts"]["primary"] == "google/gemini-3.1-flash-lite"
-    assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-image"
+    assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite-image:nitro"
     assert models["verify_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite"
     assert models["explain_error"]["primary"] == "google/gemini-3.1-flash-lite"
-    assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-lite-image"
+    assert models["analyze_artwork"]["fallback"] == "google/gemini-3.5-flash-lite"
+    assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-image:nitro"
     assert router.configured() and router.fallback_configured()
 
 
@@ -72,7 +73,7 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
     def respond(request):
         assert request.url.path.endswith("/images")
         payload = json.loads(request.content)
-        assert payload["model"] == "google/gemini-3.1-flash-image"
+        assert payload["model"] == "google/gemini-3.1-flash-lite-image:nitro"
         assert payload["aspect_ratio"] == "4:3"
         assert payload["resolution"] == "2K"
         assert payload["input_references"][0]["image_url"]["url"].startswith(
@@ -92,8 +93,8 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "google/gemini-3.1-flash-image",
-        "google/gemini-3.1-flash-image",
+        "google/gemini-3.1-flash-lite-image:nitro",
+        "google/gemini-3.1-flash-lite-image:nitro",
         transport=httpx.MockTransport(respond),
     )
     result = provider.create_pattern_mockup(image, "command", (1440, 1080))
@@ -195,6 +196,9 @@ def test_openrouter_structured_text_uses_json_schema():
         assert payload["response_format"]["type"] == "json_schema"
         assert payload["response_format"]["json_schema"]["strict"] is True
         assert payload["provider"]["require_parameters"] is True
+        assert payload["provider"]["allow_fallbacks"] is True
+        assert payload["provider"]["sort"] == "latency"
+        assert payload["plugins"] == [{"id": "response-healing"}]
         return httpx.Response(
             200,
             json={
