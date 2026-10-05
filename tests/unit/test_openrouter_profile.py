@@ -30,6 +30,17 @@ class FailedProvider(GoodProvider):
         raise EngineError("AI_TIMEOUT", "timeout")
 
 
+class FlakyStructuredProvider(GoodProvider):
+    def __init__(self):
+        self.calls = 0
+
+    def analyze_artwork(self, image):
+        self.calls += 1
+        if self.calls == 1:
+            raise EngineError("AI_RESPONSE_INVALID", "invalid structured response")
+        return {"artwork_type": "jersey"}
+
+
 def test_one_key_profile_resolves_all_operation_models():
     router = AIRouter(AISettings(openrouter_api_key="sk-or-test"))
     models = router.operation_models()
@@ -103,7 +114,29 @@ def test_global_fallback_quota_is_rolling_and_persistent(tmp_path):
     assert restarted.status()["used"] == 0
 
 
-def test_primary_failure_plus_exhausted_fallback_hard_locks(tmp_path):
+def test_transient_structured_primary_failure_retries_before_fallback(tmp_path):
+    quota = FallbackQuota(tmp_path / "quota.sqlite3", 2, 24)
+    primary = FlakyStructuredProvider()
+    router = AIRouter(
+        primary=primary,
+        fallback=GoodProvider(),
+        quota=quota,
+    )
+
+    value, metadata = router.invoke(
+        "analyze_artwork", Image.new("RGB", (64, 64))
+    )
+
+    assert value["artwork_type"] == "jersey"
+    assert primary.calls == 2
+    assert metadata["processing_mode"] == "primary_ai"
+    assert metadata["attempt_count"] == 2
+    assert metadata["failures"][0]["code"] == "AI_RESPONSE_INVALID"
+    assert metadata["failures"][0]["retry_scheduled"] is True
+    assert quota.status()["used"] == 0
+
+
+def test_exhausted_fallback_is_recoverable_provider_error(tmp_path):
     quota = FallbackQuota(tmp_path / "quota.sqlite3", 0, 24)
     router = AIRouter(
         primary=FailedProvider(),
@@ -112,8 +145,15 @@ def test_primary_failure_plus_exhausted_fallback_hard_locks(tmp_path):
     )
     with pytest.raises(EngineError) as exc:
         router.invoke("analyze_artwork", Image.new("RGB", (64, 64)))
-    assert exc.value.code == "TOOL_LOCKED_AI_UNAVAILABLE"
+    assert exc.value.code == "AI_PROVIDER_UNAVAILABLE"
+    assert exc.value.status == 503
+    assert exc.value.recoverable is True
     assert exc.value.diagnostics["fallback_quota"]["remaining"] == 0
+    assert any(
+        attempt.get("code") == "FALLBACK_DAILY_LIMIT_REACHED"
+        and attempt.get("dispatched") is False
+        for attempt in exc.value.diagnostics["attempts"]
+    )
 
 
 def test_dispatched_failed_fallback_still_consumes_quota(tmp_path):
