@@ -83,6 +83,36 @@ def confirm(e, p):
     e.workflow.review(p.project_id, decisions)
 
 
+def test_provider_supported_four_three_mockup_is_accepted_for_legacy_three_two_settings(tmp_path):
+    e = Engine(
+        Settings(data_dir=tmp_path), ai_router=AIRouter(primary=MockArtworkProvider())
+    )
+    p = e.create(
+        settings=ProcessingSettings(
+            vector_mode="precision",
+            gradients=False,
+            mockup_width=1536,
+            mockup_height=1024,
+        )
+    )
+    stream = BytesIO()
+    sheet()[0].save(stream, format="PNG")
+    e.upload(p.project_id, stream.getvalue(), "source.png")
+
+    e.run(p.project_id, "prepare")
+    current = e.load(p.project_id)
+
+    assert len(current.parts) == 8
+    assert current.ai_metadata["mockup"]["requested_dimensions"] == [1536, 1024]
+    assert current.ai_metadata["mockup"]["requested_aspect_ratio"] == "4:3"
+    assert current.ai_metadata["mockup"]["actual_dimensions"] == [1024, 768]
+
+
+def test_new_project_default_mockup_canvas_is_four_three():
+    settings = ProcessingSettings()
+    assert (settings.mockup_width, settings.mockup_height) == (1536, 1152)
+
+
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e, p = prepared(tmp_path)
     assert len(p.parts) == 8 and set(p.slots) == set(SLOTS)

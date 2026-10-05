@@ -58,7 +58,7 @@ class ProcessingSettings(BaseModel):
     allow_contour_fallback: bool = True
     max_trace_dimension: int | None = Field(None, ge=64, le=12000)
     mockup_width: int = Field(1536, ge=1024, le=1920, multiple_of=16)
-    mockup_height: int = Field(1024, ge=768, le=1920, multiple_of=16)
+    mockup_height: int = Field(1152, ge=768, le=1920, multiple_of=16)
     ai_workflow: bool = True
     # No automatic raster embedding. Hybrid reconstruction still creates vectors.
     export_mode: Literal["true_vector", "hybrid"] = "true_vector"

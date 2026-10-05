@@ -7,7 +7,11 @@ from PIL import Image
 
 from app.ai.contracts import SLOTS, PartSlot
 from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
-from app.ai.image_quality import preset_quality_label, preset_target_dimensions
+from app.ai.image_quality import (
+    nearest_supported_ratio,
+    preset_quality_label,
+    preset_target_dimensions,
+)
 from app.core.exceptions import EngineError
 from app.errors.normalization import normalize
 from app.models.project import State, now
@@ -151,6 +155,8 @@ class ProductionWorkflow:
                     else (image, size)
                 )
                 value, meta = e.ai_router.invoke(method, *args)
+                if operation in {"enhancement", "mockup"}:
+                    value = _normalize_generated_size(value, size)
                 if operation == "mockup":
                     meta.update(
                         mockup_generated=True,
@@ -158,6 +164,7 @@ class ProductionWorkflow:
                         expected_parts=list(SLOTS),
                         source_hash=p.source_hash,
                         requested_dimensions=list(size),
+                        requested_aspect_ratio=nearest_supported_ratio(size),
                         actual_dimensions=list(value.size),
                         inferred_surfaces_require_review=True,
                     )
@@ -170,11 +177,23 @@ class ProductionWorkflow:
                     "MOCKUP_DIMENSIONS_MISMATCH",
                     "Mockup is below the minimum reference resolution",
                 )
-            requested = p.settings.mockup_width / p.settings.mockup_height
-            if abs(image.width / image.height / requested - 1) > 0.05:
+            requested_ratio_name = nearest_supported_ratio(mockup_size)
+            requested_ratio = {
+                "1:1": 1.0,
+                "4:3": 4 / 3,
+                "3:4": 3 / 4,
+                "16:9": 16 / 9,
+                "9:16": 9 / 16,
+            }[requested_ratio_name]
+            if abs(image.width / image.height / requested_ratio - 1) > 0.05:
                 raise EngineError(
                     "MOCKUP_DIMENSIONS_MISMATCH",
-                    "AI returned an unexpected aspect ratio. Change canvas settings or retry the provider.",
+                    "AI returned an unexpected provider-supported aspect ratio. Retry the provider.",
+                    diagnostics={
+                        "requested_dimensions": list(mockup_size),
+                        "requested_aspect_ratio": requested_ratio_name,
+                        "actual_dimensions": list(image.size),
+                    },
                 )
 
             self.event(pid, "IDENTIFYING_PARTS")
