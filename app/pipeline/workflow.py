@@ -80,6 +80,7 @@ class ProductionWorkflow:
             p.settings.ai_workflow,
             e.ai_router.fingerprint(),
             MOCKUP_VERSION,
+            hybrid_detection.MATCHING_VERSION,
         )
         if (
             p.ai_metadata.get("prepare_signature") == list(signature)
