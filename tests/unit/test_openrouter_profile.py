@@ -74,7 +74,7 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
         payload = json.loads(request.content)
         assert payload["model"] == "google/gemini-3.1-flash-image"
         assert payload["aspect_ratio"] == "4:3"
-        assert payload["resolution"] == "1K"
+        assert payload["resolution"] == "2K"
         assert payload["input_references"][0]["image_url"]["url"].startswith(
             "data:image/png;base64,"
         )
