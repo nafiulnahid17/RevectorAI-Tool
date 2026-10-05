@@ -14,6 +14,39 @@ from app.ai.image_quality import nearest_openrouter_resolution, nearest_supporte
 from app.core.exceptions import EngineError
 
 
+SUPPORTED_GEMINI_SCHEMA_KEYS = frozenset({
+    "$id", "$defs", "$ref", "$anchor",
+    "type", "format", "title", "description", "enum",
+    "items", "prefixItems", "minItems", "maxItems",
+    "minimum", "maximum", "anyOf", "oneOf",
+    "properties", "additionalProperties", "required",
+})
+
+
+def sanitize_structured_schema(value, parent_key: str | None = None):
+    """Keep only the JSON-Schema subset accepted by Gemini structured output.
+
+    Pydantic emits keywords such as default, maxLength and exclusiveMinimum
+    that Gemini's response schema rejects with HTTP 400. Local Pydantic
+    validation still enforces the stronger application contract after parsing.
+    """
+    if isinstance(value, list):
+        return [sanitize_structured_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    if parent_key in {"properties", "$defs"}:
+        return {
+            name: sanitize_structured_schema(schema)
+            for name, schema in value.items()
+        }
+    result = {}
+    for key, item in value.items():
+        if key not in SUPPORTED_GEMINI_SCHEMA_KEYS:
+            continue
+        result[key] = sanitize_structured_schema(item, key)
+    return result
+
+
 def decode_json(value: object) -> dict:
     if isinstance(value, dict):
         return value
@@ -179,6 +212,7 @@ class CompatibleRESTProvider(HTTPProvider):
                 },
             ]
         )
+        schema = sanitize_structured_schema(schema)
         result = self.request(
             "/chat/completions",
             json={
@@ -302,8 +336,18 @@ class OpenRouterProvider(CompatibleRESTProvider):
             "properties": {
                 "x": {"type": "number", "minimum": 0, "maximum": 1},
                 "y": {"type": "number", "minimum": 0, "maximum": 1},
-                "width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
-                "height": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+                "width": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Normalized width. Must be greater than zero; application validation enforces this.",
+                },
+                "height": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Normalized height. Must be greater than zero; application validation enforces this.",
+                },
             },
             "required": ["x", "y", "width", "height"],
             "additionalProperties": False,
