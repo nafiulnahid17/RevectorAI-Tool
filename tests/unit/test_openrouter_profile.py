@@ -45,12 +45,12 @@ class FlakyStructuredProvider(GoodProvider):
 def test_one_key_profile_resolves_all_operation_models():
     router = AIRouter(AISettings(openrouter_api_key="sk-or-test"))
     models = router.operation_models()
-    assert models["analyze_artwork"]["primary"] == "google/gemini-3.1-flash-lite"
-    assert models["identify_parts"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["analyze_artwork"]["primary"] == "openai/gpt-6-luna"
+    assert models["identify_parts"]["primary"] == "openai/gpt-6-luna"
     assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite-image:nitro"
-    assert models["verify_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite"
-    assert models["explain_error"]["primary"] == "google/gemini-3.1-flash-lite"
-    assert models["analyze_artwork"]["fallback"] == "google/gemini-3.5-flash-lite"
+    assert models["verify_pattern_mockup"]["primary"] == "openai/gpt-6-luna"
+    assert models["explain_error"]["primary"] == "openai/gpt-6-luna"
+    assert models["analyze_artwork"]["fallback"] == "openai/gpt-6-luna"
     assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-image:nitro"
     assert router.configured() and router.fallback_configured()
 
@@ -62,7 +62,7 @@ def test_operation_override_does_not_change_other_routes():
     )
     models = AIRouter(settings).operation_models()
     assert models["analyze_artwork"]["primary"] == "vendor/custom-analyzer"
-    assert models["identify_parts"]["primary"] == "google/gemini-3.1-flash-lite"
+    assert models["identify_parts"]["primary"] == "openai/gpt-6-luna"
 
 
 def test_openrouter_uses_dedicated_image_api_with_reference():
@@ -192,13 +192,14 @@ def test_openrouter_structured_text_uses_json_schema():
     def respond(request):
         payload = json.loads(request.content)
         assert request.url.path.endswith("/chat/completions")
-        assert payload["model"] == "google/gemini-3.1-flash-lite"
+        assert payload["model"] == "openai/gpt-6-luna"
         assert payload["response_format"]["type"] == "json_schema"
         assert payload["response_format"]["json_schema"]["strict"] is True
         assert payload["provider"]["require_parameters"] is True
         assert payload["provider"]["allow_fallbacks"] is True
         assert payload["provider"]["sort"] == "latency"
-        assert payload["plugins"] == [{"id": "response-healing"}]
+        assert payload["reasoning"] == {"effort": "minimal"}
+        assert "plugins" not in payload
         return httpx.Response(
             200,
             json={
@@ -217,7 +218,7 @@ def test_openrouter_structured_text_uses_json_schema():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "google/gemini-3.1-flash-lite",
+        "openai/gpt-6-luna",
         "",
         transport=httpx.MockTransport(respond),
     )
