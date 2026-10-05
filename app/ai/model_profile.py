@@ -17,25 +17,24 @@ IMAGE_OPERATIONS = frozenset({
 })
 
 DEFAULT_MODELS = {
-    # Research-backed production default: Gemini 3.1 Flash Lite is GA,
-    # multimodal, inexpensive, low-latency and supports strict JSON Schema.
-    "analyze_artwork": "google/gemini-3.1-flash-lite",
-    "identify_parts": "google/gemini-3.1-flash-lite",
-    "verify_pattern_mockup": "google/gemini-3.1-flash-lite",
-    "explain_error": "google/gemini-3.1-flash-lite",
-    # Nano Banana 2 Lite is OpenRouter's fastest/cost-efficient Gemini image
-    # route. Nitro prioritizes the fastest available provider endpoint.
+    # GPT-6 Luna is currently cheaper than Gemini 3.1 Flash Lite on OpenRouter,
+    # accepts image input, and has native JSON-Schema structured outputs.
+    "analyze_artwork": "openai/gpt-6-luna",
+    "identify_parts": "openai/gpt-6-luna",
+    "verify_pattern_mockup": "openai/gpt-6-luna",
+    "explain_error": "openai/gpt-6-luna",
+    # Nano Banana 2 Lite remains the fastest/cost-efficient image generation route.
     "enhance_artwork": "google/gemini-3.1-flash-lite-image:nitro",
     "create_pattern_mockup": "google/gemini-3.1-flash-lite-image:nitro",
     "reconstruct_missing_part": "google/gemini-3.1-flash-lite-image:nitro",
 }
 
 FALLBACK_MODELS = {
-    # Use a newer Flash Lite generation only when the GA 3.1 route fails.
-    "analyze_artwork": "google/gemini-3.5-flash-lite",
-    "identify_parts": "google/gemini-3.5-flash-lite",
-    "verify_pattern_mockup": "google/gemini-3.5-flash-lite",
-    "explain_error": "google/gemini-3.5-flash-lite",
+    # Gemini stays as a cross-vendor structured-output fallback.
+    "analyze_artwork": "google/gemini-3.1-flash-lite",
+    "identify_parts": "google/gemini-3.1-flash-lite",
+    "verify_pattern_mockup": "google/gemini-3.1-flash-lite",
+    "explain_error": "google/gemini-3.1-flash-lite",
     # Image fallback trades some cost for quality/reliability and is rarely used.
     "enhance_artwork": "google/gemini-3.1-flash-image:nitro",
     "create_pattern_mockup": "google/gemini-3.1-flash-image:nitro",
