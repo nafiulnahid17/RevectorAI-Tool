@@ -76,7 +76,7 @@ class ProductionWorkflow:
             p.source_hash,
             p.settings.image_quality,
             p.settings.mockup_background,
-            mockup_size,
+            list(mockup_size),
             p.settings.ai_workflow,
             e.ai_router.fingerprint(),
             MOCKUP_VERSION,
