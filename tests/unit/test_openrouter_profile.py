@@ -175,10 +175,10 @@ def test_dispatched_failed_fallback_still_consumes_quota(tmp_path):
 
 
 def test_master_mockup_command_is_versioned_and_canonical():
-    assert MOCKUP_VERSION == "jersey-production-layout/2.0"
-    assert "CUT THE COLLAR COMPLETELY OUT OF BOTH BODY PANELS." in MASTER_MOCKUP_COMMAND
-    assert "TOTAL = 8 SEPARATED COMPONENTS." in MASTER_MOCKUP_COMMAND
-    assert "uploaded Original Image and its Enhanced Image" in MASTER_MOCKUP_COMMAND
+    assert MOCKUP_VERSION == "jersey-production-layout/1.0"
+    assert "Exactly eight detached" in MASTER_MOCKUP_COMMAND
+    assert "NO DOUBLE COLLARS" in MASTER_MOCKUP_COMMAND
+    assert "Output only the raster reference layout." in MASTER_MOCKUP_COMMAND
 
 
 def test_workspace_presets_control_ai_raster_targets():
