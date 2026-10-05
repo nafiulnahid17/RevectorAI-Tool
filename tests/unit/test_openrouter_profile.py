@@ -45,14 +45,15 @@ class FlakyStructuredProvider(GoodProvider):
 def test_one_key_profile_resolves_all_operation_models():
     router = AIRouter(AISettings(openrouter_api_key="sk-or-test"))
     models = router.operation_models()
-    assert models["analyze_artwork"]["primary"] == "openai/gpt-6-luna"
-    assert models["identify_parts"]["primary"] == "openai/gpt-6-luna"
-    assert models["create_pattern_mockup"]["primary"] == "google/gemini-3.1-flash-lite-image:nitro"
-    assert models["verify_pattern_mockup"]["primary"] == "openai/gpt-6-luna"
-    assert models["explain_error"]["primary"] == "openai/gpt-6-luna"
-    assert models["analyze_artwork"]["fallback"] == "google/gemini-3.1-flash-lite"
-    assert models["create_pattern_mockup"]["fallback"] == "google/gemini-3.1-flash-image:nitro"
-    assert router.configured() and router.fallback_configured()
+    assert models["analyze_artwork"]["primary"] == "meta-llama/llama-4-scout"
+    assert models["identify_parts"]["primary"] == "meta-llama/llama-4-scout"
+    assert models["create_pattern_mockup"]["primary"] == "black-forest-labs/flux.2-klein-4b"
+    assert models["verify_pattern_mockup"]["primary"] == "meta-llama/llama-4-scout"
+    assert models["explain_error"]["primary"] == "meta-llama/llama-4-scout"
+    assert models["analyze_artwork"]["fallback"] == ""
+    assert models["create_pattern_mockup"]["fallback"] == ""
+    assert router.configured()
+    assert router.fallback_configured() is False
 
 
 def test_operation_override_does_not_change_other_routes():
@@ -62,7 +63,7 @@ def test_operation_override_does_not_change_other_routes():
     )
     models = AIRouter(settings).operation_models()
     assert models["analyze_artwork"]["primary"] == "vendor/custom-analyzer"
-    assert models["identify_parts"]["primary"] == "openai/gpt-6-luna"
+    assert models["identify_parts"]["primary"] == "meta-llama/llama-4-scout"
 
 
 def test_openrouter_uses_dedicated_image_api_with_reference():
@@ -73,9 +74,10 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
     def respond(request):
         assert request.url.path.endswith("/images")
         payload = json.loads(request.content)
-        assert payload["model"] == "google/gemini-3.1-flash-lite-image:nitro"
+        assert payload["model"] == "black-forest-labs/flux.2-klein-4b"
         assert payload["aspect_ratio"] == "4:3"
-        assert payload["resolution"] == "2K"
+        assert payload["output_format"] == "png"
+        assert "resolution" not in payload
         assert payload["input_references"][0]["image_url"]["url"].startswith(
             "data:image/png;base64,"
         )
@@ -93,8 +95,8 @@ def test_openrouter_uses_dedicated_image_api_with_reference():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "google/gemini-3.1-flash-lite-image:nitro",
-        "google/gemini-3.1-flash-lite-image:nitro",
+        "black-forest-labs/flux.2-klein-4b",
+        "black-forest-labs/flux.2-klein-4b",
         transport=httpx.MockTransport(respond),
     )
     result = provider.create_pattern_mockup(image, "command", (1440, 1080))
@@ -192,13 +194,13 @@ def test_openrouter_structured_text_uses_json_schema():
     def respond(request):
         payload = json.loads(request.content)
         assert request.url.path.endswith("/chat/completions")
-        assert payload["model"] == "openai/gpt-6-luna"
+        assert payload["model"] == "meta-llama/llama-4-scout"
         assert payload["response_format"]["type"] == "json_schema"
         assert payload["response_format"]["json_schema"]["strict"] is True
         assert payload["provider"]["require_parameters"] is True
         assert payload["provider"]["allow_fallbacks"] is True
         assert payload["provider"]["sort"] == "latency"
-        assert payload["reasoning"] == {"effort": "minimal"}
+        assert "reasoning" not in payload
         assert "plugins" not in payload
         return httpx.Response(
             200,
@@ -218,7 +220,7 @@ def test_openrouter_structured_text_uses_json_schema():
         "openrouter",
         "https://openrouter.ai/api/v1",
         "sk-or-test",
-        "openai/gpt-6-luna",
+        "meta-llama/llama-4-scout",
         "",
         transport=httpx.MockTransport(respond),
     )
