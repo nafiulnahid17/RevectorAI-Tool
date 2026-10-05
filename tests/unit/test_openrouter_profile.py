@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from app.ai.adapters import OpenRouterProvider, sanitize_structured_schema
+from app.ai.contracts import ArtworkAnalysis
 from app.ai.image_quality import preset_target_dimensions
 from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
 from app.ai.quota import FallbackQuota
@@ -192,6 +193,81 @@ def test_workspace_presets_control_ai_raster_targets():
     assert preset_target_dimensions("BALANCED", "1:1") == (720, 720)
     assert preset_target_dimensions("FAST", "1:1") == (1080, 1080)
     assert preset_target_dimensions("ULTRA", "1:1") == (1440, 1440)
+
+
+def test_artwork_analysis_schema_has_no_open_ended_objects():
+    schema = sanitize_structured_schema(ArtworkAnalysis.model_json_schema())
+    schema["required"] = list(schema.get("properties", {}))
+    schema["additionalProperties"] = False
+
+    def walk(value):
+        if isinstance(value, dict):
+            if value.get("type") == "object":
+                assert value.get("additionalProperties") is False
+                if "properties" in value:
+                    assert set(value.get("required", [])) == set(value["properties"])
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item)
+
+    walk(schema)
+    assert schema["properties"]["logos"]["items"]["$ref"] == "#/$defs/LogoEvidence"
+    assert schema["properties"]["text_regions"]["items"]["$ref"] == "#/$defs/TextRegionEvidence"
+
+
+def test_openrouter_analyze_artwork_sends_strict_nested_schema():
+    def respond(request):
+        payload = json.loads(request.content)
+        js = payload["response_format"]["json_schema"]
+        schema = js["schema"]
+        assert js["strict"] is True
+        assert schema["additionalProperties"] is False
+        assert schema["$defs"]["LogoEvidence"]["additionalProperties"] is False
+        assert schema["$defs"]["TextRegionEvidence"]["additionalProperties"] is False
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "artwork_type": "jersey",
+                                    "expected_parts": [],
+                                    "visible_parts": [],
+                                    "missing_parts": [],
+                                    "uncertain_parts": [],
+                                    "dominant_colors": [],
+                                    "logos": [],
+                                    "text_regions": [],
+                                    "names": [],
+                                    "numbers": [],
+                                    "sponsors": [],
+                                    "patterns": [],
+                                    "collar_design": "",
+                                    "sleeve_design": "",
+                                    "confidence": None,
+                                    "notes": [],
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    provider = OpenRouterProvider(
+        "openrouter",
+        "https://openrouter.ai/api/v1",
+        "sk-or-test",
+        "openai/gpt-5.6-terra",
+        "",
+        transport=httpx.MockTransport(respond),
+    )
+    result = provider.analyze_artwork(Image.new("RGB", (64, 64), "black"))
+    assert result["artwork_type"] == "jersey"
 
 
 def test_openrouter_structured_text_uses_json_schema():
