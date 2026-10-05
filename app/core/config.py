@@ -1,4 +1,4 @@
-"""Environment-based settings. No AI credential is needed for deterministic operation."""
+"""Environment-based settings. Deterministic vector operation does not require AI."""
 from pathlib import Path
 import importlib.util
 import shutil
@@ -43,19 +43,54 @@ def capabilities() -> dict[str, bool]:
 
 
 class AISettings(BaseSettings):
-    """Explicit, unprefixed provider variables. Secrets never serialize publicly."""
-    model_config = SettingsConfigDict(env_file='.env', extra='ignore')
-    main_ai_provider: str = ''
+    """Server-only AI configuration.
+
+    Standard production deployment needs only OPENROUTER_API_KEY. Operation model
+    variables are optional overrides. Legacy provider variables remain supported.
+    """
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    openrouter_api_key: SecretStr | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    revector_ai_profile: str = "production"
+
+    analyze_model: str = ""
+    identify_model: str = ""
+    enhance_model: str = ""
+    mockup_model: str = ""
+    mockup_qc_model: str = ""
+    missing_part_model: str = ""
+    error_model: str = ""
+
+    analyze_fallback_model: str = ""
+    identify_fallback_model: str = ""
+    enhance_fallback_model: str = ""
+    mockup_fallback_model: str = ""
+    mockup_qc_fallback_model: str = ""
+    missing_part_fallback_model: str = ""
+    error_fallback_model: str = ""
+
+    fallback_max_calls: int = Field(2, ge=0, le=100)
+    fallback_window_hours: int = Field(24, ge=1, le=168)
+    fallback_limit_scope: str = "global"
+
+    voice_provider: str = "openrouter"
+    voice_model: str = ""
+    voice_fallback_model: str = ""
+
+    # Legacy compatibility.
+    main_ai_provider: str = ""
     main_ai_api_key: SecretStr | None = None
-    main_ai_base_url: str = ''
-    main_ai_model: str = ''
-    main_ai_image_model: str = ''
-    cloudflare_account_id: str = ''
+    main_ai_base_url: str = ""
+    main_ai_model: str = ""
+    main_ai_image_model: str = ""
+    cloudflare_account_id: str = ""
     cloudflare_ai_token: SecretStr | None = None
-    cloudflare_ai_model: str = ''
-    cloudflare_ai_image_model: str = ''
-    error_ai_provider: str = 'cloudflare'
+    cloudflare_ai_model: str = ""
+    cloudflare_ai_image_model: str = ""
+    error_ai_provider: str = "cloudflare"
     error_ai_api_key: SecretStr | None = None
-    error_ai_base_url: str = ''
-    error_ai_model: str = ''
+    error_ai_base_url: str = ""
+    error_ai_model: str = ""
     ai_timeout_seconds: int = Field(120, ge=1, le=600)

@@ -9,7 +9,8 @@ from urllib.parse import quote, urlparse
 import httpx
 from PIL import Image
 
-from app.ai.prompts import ANALYZE_COMMAND, ENHANCE_COMMAND, IDENTIFY_COMMAND
+from app.ai.prompts import ANALYZE_COMMAND, ENHANCE_COMMAND, IDENTIFY_COMMAND, MOCKUP_QC_COMMAND
+from app.ai.image_quality import nearest_openrouter_resolution, nearest_supported_ratio
 from app.core.exceptions import EngineError
 
 
@@ -74,6 +75,7 @@ class HTTPProvider:
         self.name, self.base_url, self.key = name, base_url.rstrip("/"), key
         self.model, self.image_model, self.timeout = model, image_model, timeout
         self.transport = transport
+        self.last_usage = {}
 
     def auth_headers(self) -> dict[str, str]:
         return {"Authorization": "Bearer " + self.key}
@@ -125,6 +127,13 @@ class HTTPProvider:
     def identify_parts(self, image: Image.Image) -> list[dict]:
         return self.text(IDENTIFY_COMMAND, image).get("candidates", [])
 
+    def verify_pattern_mockup(self, image: Image.Image) -> dict:
+        return self.text(
+            MOCKUP_QC_COMMAND
+            + "\nReference sheet order is ORIGINAL | ENHANCED | GENERATED MOCKUP.",
+            image,
+        )
+
     def enhance_artwork(self, image: Image.Image, size: tuple[int, int]) -> Image.Image:
         return self.generate(image, ENHANCE_COMMAND, size)
 
@@ -175,6 +184,7 @@ class CompatibleRESTProvider(HTTPProvider):
                 "response_format": {"type": "json_object"},
             },
         )
+        self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
         try:
             return decode_json(result["choices"][0]["message"]["content"])
         except (KeyError, IndexError, TypeError) as exc:
@@ -205,6 +215,46 @@ class CompatibleRESTProvider(HTTPProvider):
             raise EngineError(
                 "AI_RESPONSE_INVALID",
                 "Image-edit response requires inline image bytes; remote URLs are not fetched",
+            ) from exc
+
+
+class OpenRouterProvider(CompatibleRESTProvider):
+    """OpenRouter text/vision plus the dedicated unified Image API."""
+
+    def generate(
+        self, image: Image.Image, prompt: str, size: tuple[int, int]
+    ) -> Image.Image:
+        if not self.image_model:
+            raise EngineError(
+                "AI_CAPABILITY_UNAVAILABLE",
+                "Configure an OpenRouter image model for this operation",
+            )
+        reference = (
+            "data:image/png;base64,"
+            + base64.b64encode(image_bytes(image, 2048)).decode()
+        )
+        result = self.request(
+            "/images",
+            json={
+                "model": self.image_model,
+                "prompt": prompt,
+                "aspect_ratio": nearest_supported_ratio(size),
+                "resolution": nearest_openrouter_resolution(size),
+                "input_references": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": reference},
+                    }
+                ],
+            },
+        )
+        self.last_usage = result.get("usage", {}) if isinstance(result, dict) else {}
+        try:
+            return decode_image(result["data"][0]["b64_json"])
+        except (KeyError, IndexError, TypeError) as exc:
+            raise EngineError(
+                "AI_RESPONSE_INVALID",
+                "OpenRouter Image API returned no inline image bytes",
             ) from exc
 
 

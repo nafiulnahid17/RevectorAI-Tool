@@ -50,6 +50,8 @@ class ProcessingSettings(BaseModel):
     segment_min_area_ratio: float = Field(0.01, ge=0.0001, le=0.9)
     noise_reduction: bool = True
     preserve_original_colors: bool = True
+    image_quality: Literal["LOW", "MEDIUM", "HIGH", "MAX"] = "MEDIUM"
+    mockup_background: Literal["black", "white"] = "black"
     ocr: bool = False
     text_mode: Literal["outlined", "editable"] = "outlined"
     gradients: bool = True
