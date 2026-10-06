@@ -38,7 +38,7 @@ def trace(source: Path, destination: Path, settings: ProcessingSettings, timeout
         report = validate_svg(ET.tostring(root, encoding="utf-8"))
         if not report["true_vector"]:
             raise EngineError("INVALID_PATH_GEOMETRY", "VTracer produced invalid vector geometry; deterministic fallback may be used",diagnostics={"validation_errors":report["errors"],"trace_engine":"vtracer"})
-        return root, {"backend": "vtracer", "parameters": p, "discarded_empty_paths": discarded}
+        return root, {"backend": "vtracer", "parameters": p, "hierarchy": "cutout", "pathfinder_compatible": True, "discarded_empty_paths": discarded}
     except subprocess.TimeoutExpired as exc:
         raise EngineError("VECTOR_TRACE_FAILED","VTracer exceeded its subprocess time budget; deterministic fallback may be used") from exc
     except EngineError:
