@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     max_upload_bytes: int = Field(50 * 1024 * 1024, ge=1024)
     max_pixels: int = Field(40_000_000, ge=100)
+    max_export_pixels: int = Field(80_000_000, ge=1_000_000, le=200_000_000)
     worker_threads: int = Field(2, ge=1, le=8)
     sync_jobs: bool = False
     job_timeout_seconds: int = Field(1800, ge=1, le=14400)
