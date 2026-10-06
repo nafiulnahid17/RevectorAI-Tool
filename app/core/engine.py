@@ -481,12 +481,13 @@ class Engine:
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Optimization cancelled")
             raw = self.key(p, f"vectors/{part.part_id}.raw.svg")
-            signature = digest([self.file_hash(raw), p.settings.preset])
+            optimize_preset = part.metrics.get("production_preset", p.settings.preset)
+            signature = digest([PRODUCTION_VECTOR_VERSION, self.file_hash(raw), optimize_preset])
             if part.cache.get("optimize") == signature and part.vector and self.storage.exists(part.vector):
                 results[part.part_id] = {"cached": True}
                 continue
             root = SafeET.fromstring(self.storage.get(raw))
-            metrics = optimize(root, p.settings.preset)
+            metrics = optimize(root, optimize_preset)
             existing_ids = {element.get("id") for element in root.iter() if element.get("id")}
             for index, element in enumerate(root.iter()):
                 if element.tag.split("}")[-1] in {"path", "rect", "circle", "ellipse", "polygon", "polyline", "line"} and not element.get("id"):
