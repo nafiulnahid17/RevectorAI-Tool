@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 import pytest
 from PIL import Image
-from app.pipeline.export import verify_conversion
+from app.pipeline.export import verify_conversion, _physical_inches
 from app.core.exceptions import EngineError
 
 @pytest.mark.skipif(not shutil.which('pdfimages'),reason='Poppler unavailable')
@@ -17,3 +17,9 @@ def test_missing_export_parser_preserves_safe_failure(tmp_path,monkeypatch):
     monkeypatch.setattr(shutil,'which',lambda tool:None)
     with pytest.raises(EngineError) as error:verify_conversion(tmp_path/'output.pdf','pdf',1,'true_vector')
     assert error.value.code=='EXPORT_VALIDATION_UNAVAILABLE'
+
+
+def test_physical_units_map_to_expected_300_dpi_dimensions():
+    assert round(_physical_inches("558.8mm") * 300) == 6600
+    assert round(_physical_inches("787.4mm") * 300) == 9300
+    assert _physical_inches("1536px") is None
