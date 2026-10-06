@@ -652,8 +652,24 @@ class Engine:
                         raise EngineError("JOB_CANCELLED", "Part export cancelled")
                     key = self.key(p, f"exports/{part.part_id}.{format}")
                     try:
-                        output = (part_data if format == "svg" else ingest.png_bytes(render_svg(part_data)) if format == "png"
-                                  else exporter.convert(part_data, format, self.settings.tool_timeout_seconds, p.settings.export_mode))
+                        output = (
+                            part_data
+                            if format == "svg"
+                            else exporter.rasterize_png(
+                                part_data,
+                                dpi=300,
+                                timeout=self.settings.tool_timeout_seconds,
+                                mode=p.settings.export_mode,
+                                max_pixels=self.settings.max_export_pixels,
+                            )
+                            if format == "png"
+                            else exporter.convert(
+                                part_data,
+                                format,
+                                self.settings.tool_timeout_seconds,
+                                p.settings.export_mode,
+                            )
+                        )
                         self.storage.put(key, output)
                         part.exports[format] = key
                         p.usage["export_operations"] += 1
