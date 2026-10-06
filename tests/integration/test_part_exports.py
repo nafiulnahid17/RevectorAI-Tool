@@ -77,7 +77,7 @@ def test_color_edit_invalidates_downloads_and_survives_revalidation(engine):
     assert engine.load(p.project_id).true_vector_ready
 
 
-@pytest.mark.skipif(not shutil.which('inkscape'), reason='Inkscape required')
+@pytest.mark.skipif(not all(shutil.which(tool) for tool in ('inkscape','pdfinfo','pdfimages','gs')), reason='Inkscape + Poppler + Ghostscript required')
 def test_individual_vector_pdf_eps_and_pack(engine):
     p = complete(engine)
     result = engine.run(p.project_id, 'export', {'part_id': p.parts[0].part_id, 'formats': ['pdf', 'eps', 'zip']})
