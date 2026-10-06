@@ -100,3 +100,34 @@ def test_project_manifest_exposes_part_download_but_no_unlisted_file(tmp_path, s
         key = response.json()['result']['part_files'][part_id]['svg']
         assert client.get(f'/api/revector/projects/{pid}/artifacts/' + key.split(pid + '/')[1]).status_code == 200
         assert client.get(f'/api/revector/projects/{pid}/artifacts/project.json').status_code == 404
+
+
+def test_selected_files_zip_is_distinct_from_production_pack(engine):
+    p = complete(engine)
+    ids = [part.part_id for part in p.parts[:2]]
+
+    selected = engine.run(
+        p.project_id,
+        'export',
+        {'part_ids': ids, 'formats': ['svg', 'zip'], 'bundle': 'selected_files'},
+    )
+    with zipfile.ZipFile(BytesIO(engine.storage.get(selected['exports']['zip']))) as archive:
+        names = archive.namelist()
+        assert names
+        assert all('/' not in name for name in names)
+        assert all(name.endswith('.svg') for name in names)
+        assert not any(name.startswith('metadata/') for name in names)
+        assert not any(name.startswith('previews/') for name in names)
+
+    pack = engine.run(
+        p.project_id,
+        'export',
+        {'part_ids': ids, 'formats': ['svg', 'zip'], 'bundle': 'production_pack'},
+    )
+    assert selected['exports']['zip'] != pack['exports']['zip']
+    with zipfile.ZipFile(BytesIO(engine.storage.get(pack['exports']['zip']))) as archive:
+        names = archive.namelist()
+        assert any(name.startswith('parts/') for name in names)
+        assert any(name.startswith('metadata/') for name in names)
+        assert any(name.startswith('previews/') for name in names)
+        assert 'README.txt' in names

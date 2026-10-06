@@ -678,14 +678,48 @@ class Engine:
                 part_files[part.part_id] = dict(part.exports)
             exports = {}
             if "zip" in formats:
-                token = digest(sorted(set(selected_ids)))[:16]
-                key = self.key(p, f"exports/selected-parts-{token}.zip")
-                self.storage.put(key, self.pack(p, selected_ids=set(selected_ids)))
-                p.exports[f"selected_zip_{token}"] = key
+                token = digest([sorted(set(selected_ids)), sorted(formats), params.get("bundle", "selected_files")])[:16]
+                bundle = params.get("bundle", "selected_files")
+                if bundle == "production_pack":
+                    key = self.key(p, f"exports/production-pack-{token}.zip")
+                    payload = self.pack(p, selected_ids=set(selected_ids))
+                    p.exports[f"production_pack_{token}"] = key
+                else:
+                    key = self.key(p, f"exports/selected-files-{token}.zip")
+                    payload = self.pack_selected_files(p, set(selected_ids), set(formats))
+                    p.exports[f"selected_files_{token}"] = key
+                self.storage.put(key, payload)
                 exports["zip"] = key
                 p.usage["export_operations"] += 1
-            return {"exports": exports, "part_files": part_files, "export_errors": failures, "success": not failures}
+            return {
+                "exports": exports,
+                "part_files": part_files,
+                "export_errors": failures,
+                "success": not failures,
+                "bundle": params.get("bundle", "selected_files"),
+            }
         raise EngineError('INVALID_EXPORT_SELECTION','No real production parts selected')
+
+    def pack_selected_files(self, p: Project, selected_ids: set[str], formats: set[str]) -> bytes:
+        """Create the lightweight Download Selected Parts archive.
+
+        This archive intentionally contains only the user-selected production
+        files. Metadata, previews and handoff reports belong to Production Pack.
+        """
+        stream = BytesIO()
+        requested = {fmt for fmt in formats if fmt != "zip"}
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+            for part in p.parts:
+                if part.part_id not in selected_ids:
+                    continue
+                for fmt in sorted(requested):
+                    key = part.exports.get(fmt)
+                    if key and self.storage.exists(key):
+                        archive.writestr(
+                            f"{part.type}-{part.part_id}.{fmt}",
+                            self.storage.get(key),
+                        )
+        return stream.getvalue()
 
     def pack(self, p: Project, selected_ids: set[str] | None = None) -> bytes:
         stream = BytesIO()
