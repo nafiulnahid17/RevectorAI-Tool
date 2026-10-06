@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from xml.etree import ElementTree as ET
 from shapely.geometry import Polygon, MultiPolygon
+from svgpathtools import parse_path
 from app.vector.contour import SVG, contour_d
 from app.models.project import Project, Part
 

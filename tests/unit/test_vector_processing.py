@@ -69,3 +69,8 @@ def test_production_defaults_preserve_fine_artwork():
     assert settings.min_region_area == 2
     assert settings.ocr is True
     assert settings.allow_contour_fallback is False
+
+
+def test_svg_composer_imports_path_parser_for_semantic_grouping():
+    from app.vector import svg_composer
+    assert callable(svg_composer.parse_path)
