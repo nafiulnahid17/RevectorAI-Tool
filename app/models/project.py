@@ -44,18 +44,18 @@ class ProcessingSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     preset: Literal["FAST", "BALANCED", "PRECISION", "ULTRA"] = "BALANCED"
     vector_mode: Literal["precision", "color", "mono", "reconstruction"] = "color"
-    max_colors: int = Field(12, ge=2, le=64)
-    delta_e: float = Field(5, ge=0, le=30)
-    min_region_area: float = Field(6, ge=0, le=10000)
+    max_colors: int = Field(32, ge=2, le=64)
+    delta_e: float = Field(2, ge=0, le=30)
+    min_region_area: float = Field(2, ge=0, le=10000)
     segment_min_area_ratio: float = Field(0.01, ge=0.0001, le=0.9)
     noise_reduction: bool = True
     preserve_original_colors: bool = True
     image_quality: Literal["LOW", "MEDIUM", "HIGH", "MAX"] = "MEDIUM"
     mockup_background: Literal["black", "white"] = "black"
-    ocr: bool = False
+    ocr: bool = True
     text_mode: Literal["outlined", "editable"] = "outlined"
     gradients: bool = True
-    allow_contour_fallback: bool = True
+    allow_contour_fallback: bool = False
     max_trace_dimension: int | None = Field(None, ge=64, le=12000)
     mockup_width: int = Field(1536, ge=1024, le=1920, multiple_of=16)
     mockup_height: int = Field(1152, ge=768, le=1920, multiple_of=16)

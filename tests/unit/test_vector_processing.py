@@ -57,6 +57,15 @@ def test_native_timeout_uses_contours_without_accepting_invalid_geometry(monkeyp
     image=Image.new('RGBA',(80,80));ImageDraw.Draw(image).rectangle((10,10,70,70),fill='purple')
     def timeout(*args,**kwargs):raise EngineError('VECTOR_TRACE_FAILED','native timed out')
     monkeypatch.setattr(vtracer_engine,'trace',timeout)
-    root,metadata=vectorize(image,image,ProcessingSettings(gradients=False),2)
+    root,metadata=vectorize(image,image,ProcessingSettings(gradients=False, allow_contour_fallback=True),2)
     assert metadata['backend']=='opencv_color_contours' and metadata['fallback_attempted']
     assert metadata['attempts'][0]['status']=='FAILED'
+
+
+def test_production_defaults_preserve_fine_artwork():
+    settings = ProcessingSettings()
+    assert settings.max_colors == 32
+    assert settings.delta_e == 2
+    assert settings.min_region_area == 2
+    assert settings.ocr is True
+    assert settings.allow_contour_fallback is False

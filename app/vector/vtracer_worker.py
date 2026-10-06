@@ -13,14 +13,15 @@ def convert(source: Path, destination: Path, preset: str):
         str(source),
         str(destination),
         colormode="color",
-        hierarchical="stacked",
+        # Cutout mode creates non-overlapping paint regions, closer to Illustrator Pathfinder output.
+        hierarchical="cutout",
         mode="spline",
         filter_speckle=p["filter_speckle"],
         color_precision=p["color_precision"],
-        layer_difference=16,
+        layer_difference=8,
         corner_threshold=60,
         length_threshold=max(0.5, p["epsilon"]),
-        max_iterations=10,
+        max_iterations=12,
         splice_threshold=45,
         path_precision=p["path_precision"],
     )

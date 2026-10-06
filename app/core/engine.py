@@ -24,6 +24,7 @@ from app.vector.svg_composer import compose, diagnostic
 from app.validators.svg_validator import validate_svg
 from app.validators.visual_diff import render_svg, compare
 
+PRODUCTION_VECTOR_VERSION = "illustrator-production/1.0"
 STAGES = ["analyze", "correct-geometry", "segment", "reconstruct", "vectorize", "optimize", "compose", "validate"]
 STATES = {
     "analyze": (State.ANALYZING, State.ANALYZED),
@@ -349,8 +350,23 @@ class Engine:
         for part in self.selected(p, params):
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Reconstruction cancelled")
-            signature = digest([colors.PALETTE_VERSION, self.file_hash(part.corrected_crop), p.settings.max_colors, p.settings.delta_e,
-                                p.settings.noise_reduction, p.settings.ocr])
+            production_settings = p.settings.model_copy(
+                update={
+                    "max_colors": max(32, p.settings.max_colors),
+                    "delta_e": min(2.0, p.settings.delta_e),
+                    "min_region_area": min(2.0, p.settings.min_region_area),
+                    "ocr": True,
+                }
+            )
+            signature = digest([
+                PRODUCTION_VECTOR_VERSION,
+                colors.PALETTE_VERSION,
+                self.file_hash(part.corrected_crop),
+                production_settings.max_colors,
+                production_settings.delta_e,
+                production_settings.noise_reduction,
+                production_settings.ocr,
+            ])
             if part.cache.get("reconstruct") == signature and part.clean_reference and part.vectorization_source:
                 results[part.part_id] = {"cached": True}
                 continue
@@ -365,13 +381,13 @@ class Engine:
                     source = restored
                 except Exception:
                     part.warnings.append("AI_PROVIDER_UNAVAILABLE: reconstruction failed; deterministic source retained.")
-            ref, trace, palette, meta = reconstruction.reconstruct(source, p.settings)
+            ref, trace, palette, meta = reconstruction.reconstruct(source, production_settings)
             prefix = f"parts/{part.part_id}/"
             part.clean_reference = self.put_image(self.key(p, prefix + "clean_reference.png"), ref)
             part.vectorization_source = self.put_image(self.key(p, prefix + "vectorization_source.png"), trace)
             part.palette = palette
             part.decomposition = decomposition.decompose(ref, palette)
-            if p.settings.ocr:
+            if production_settings.ocr:
                 try:
                     if not self.ocr_provider:
                         raise EngineError("OCR_FAILED", "No OCR provider is available")
@@ -389,15 +405,38 @@ class Engine:
             self.require(bool(part.clean_reference and part.vectorization_source), "Reconstruct selected parts first")
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Vectorization cancelled")
-            signature = digest([self.file_hash(part.clean_reference), self.file_hash(part.vectorization_source),
-                                p.settings.preset, p.settings.vector_mode, p.settings.min_region_area,
-                                p.settings.gradients, p.settings.max_trace_dimension, p.settings.allow_contour_fallback, params.get("fallback_trace",False)])
+            fallback_trace = bool(params.get("fallback_trace", False))
+            production_preset = {
+                "FAST": "BALANCED",
+                "BALANCED": "PRECISION",
+                "PRECISION": "ULTRA",
+                "ULTRA": "ULTRA",
+            }[p.settings.preset]
+            trace_settings = p.settings.model_copy(
+                update={
+                    "preset": "ULTRA" if fallback_trace else production_preset,
+                    "vector_mode": "precision" if fallback_trace else p.settings.vector_mode,
+                    "gradients": False if fallback_trace else p.settings.gradients,
+                    "allow_contour_fallback": fallback_trace,
+                    "max_trace_dimension": None,
+                }
+            )
+            signature = digest([
+                PRODUCTION_VECTOR_VERSION,
+                self.file_hash(part.clean_reference),
+                self.file_hash(part.vectorization_source),
+                trace_settings.model_dump(),
+                fallback_trace,
+            ])
             if part.cache.get("vectorize") == signature and part.vector and self.storage.exists(part.vector):
                 results[part.part_id] = {"cached": True}
                 continue
-            trace_settings = p.settings.model_copy(update={'vector_mode':'precision','gradients':False}) if params.get('fallback_trace') else p.settings
-            root, meta = vectorization.vectorize(self.image(part.clean_reference), self.image(part.vectorization_source),
-                                                 trace_settings, self.settings.tool_timeout_seconds)
+            root, meta = vectorization.vectorize(
+                self.image(part.clean_reference),
+                self.image(part.vectorization_source),
+                trace_settings,
+                self.settings.tool_timeout_seconds,
+            )
             data = ET.tostring(root, encoding="utf-8", xml_declaration=True)
             check = validate_svg(data, max_bytes=self.settings.max_svg_bytes, max_pixels=self.settings.max_pixels)
             if not check["true_vector"]:
@@ -408,8 +447,26 @@ class Engine:
             raw_key = self.key(p, f"vectors/{part.part_id}.raw.svg")
             self.storage.put(raw_key, data)
             part.vector = raw_key
-            part.metrics = {"before_paths": check["path_count"], "before_anchors": check["total_anchor_count"],
-                            "embedded_rasters": check["embedded_rasters"], "backend": meta["backend"], "trace_metadata": meta}
+            part.metrics = {
+                "before_paths": check["path_count"],
+                "before_anchors": check["total_anchor_count"],
+                "embedded_rasters": check["embedded_rasters"],
+                "backend": meta["backend"],
+                "trace_metadata": meta,
+                "production_vector_version": PRODUCTION_VECTOR_VERSION,
+                "production_preset": trace_settings.preset,
+                "explicit_fallback_trace": fallback_trace,
+            }
+            log_event(
+                "vector_trace_complete",
+                project_id=p.project_id,
+                part_id=part.part_id,
+                backend=meta.get("backend"),
+                paths=check["path_count"],
+                anchors=check["total_anchor_count"],
+                fallback_attempted=meta.get("fallback_attempted", False),
+                preset=trace_settings.preset,
+            )
             if check["path_count"] > 10000:
                 part.warnings.append(f"Complex texture generated {check['path_count']} paths; consider a lower detail preset.")
             part.warnings.extend(meta.get("warnings", []))
@@ -424,12 +481,13 @@ class Engine:
             if cancelled():
                 raise EngineError("JOB_CANCELLED", "Optimization cancelled")
             raw = self.key(p, f"vectors/{part.part_id}.raw.svg")
-            signature = digest([self.file_hash(raw), p.settings.preset])
+            optimize_preset = part.metrics.get("production_preset", p.settings.preset)
+            signature = digest([PRODUCTION_VECTOR_VERSION, self.file_hash(raw), optimize_preset])
             if part.cache.get("optimize") == signature and part.vector and self.storage.exists(part.vector):
                 results[part.part_id] = {"cached": True}
                 continue
             root = SafeET.fromstring(self.storage.get(raw))
-            metrics = optimize(root, p.settings.preset)
+            metrics = optimize(root, optimize_preset)
             existing_ids = {element.get("id") for element in root.iter() if element.get("id")}
             for index, element in enumerate(root.iter()):
                 if element.tag.split("}")[-1] in {"path", "rect", "circle", "ellipse", "polygon", "polyline", "line"} and not element.get("id"):
@@ -505,7 +563,25 @@ class Engine:
                 raise EngineError("SVG_VALIDATION_FAILED", "A composed part did not pass True Vector validation")
             part_render = render_svg(part_data, part.bbox[2], part.bbox[3])
             part_diff, _ = compare(self.image(part.clean_reference), part_render)
-            part.validation = {**part_report,"render_succeeded":True,"validated_sha256":hashlib.sha256(part_data).hexdigest()}
+            trace_backend = part.metrics.get("backend")
+            production_quality = (
+                "PASS"
+                if trace_backend == "vtracer" and not part.metrics.get("explicit_fallback_trace")
+                else "REVIEW_REQUIRED"
+            )
+            part.validation = {
+                **part_report,
+                "render_succeeded": True,
+                "validated_sha256": hashlib.sha256(part_data).hexdigest(),
+                "trace_backend": trace_backend,
+                "production_quality": production_quality,
+                "pathfinder_hierarchy": part.metrics.get("trace_metadata", {}).get("hierarchy"),
+                "ocr_objects": len(part.ocr_results),
+            }
+            if production_quality != "PASS":
+                part.validation["warnings"] = list(part.validation.get("warnings", [])) + [
+                    "Production used an explicit/fallback contour trace; review paths before manufacturing."
+                ]
             diagnostic_data, diagnostic_nodes = diagnostic(part_data)
             diagnostic_key = self.key(p,f'previews/{part.part_id}-paths.svg')
             self.storage.put(diagnostic_key,diagnostic_data)
@@ -514,7 +590,10 @@ class Engine:
             report["parts"].append({"part_id": part.part_id, "part": part.type, "paths": part_report["path_count"],
                                     "anchors": part_report["total_anchor_count"], "rasters": part_report["embedded_rasters"], "status": "PASS",
                                     "validated_sha256": hashlib.sha256(part_data).hexdigest(),
-                                    "physical_width_mm": part.physical_width_mm, "physical_height_mm": part.physical_height_mm})
+                                    "physical_width_mm": part.physical_width_mm, "physical_height_mm": part.physical_height_mm,
+                                    "trace_backend": part.validation.get("trace_backend"),
+                                    "production_quality": part.validation.get("production_quality"),
+                                    "ocr_objects": part.validation.get("ocr_objects", 0)})
         p.previews = {"reference": self.put_image(self.key(p, "previews/reference.png"), reference),
                       "vector_render": self.put_image(self.key(p, "previews/vector_render.png"), vector),
                       "difference": self.put_image(self.key(p, "previews/difference.png"), difference)}
@@ -573,8 +652,24 @@ class Engine:
                         raise EngineError("JOB_CANCELLED", "Part export cancelled")
                     key = self.key(p, f"exports/{part.part_id}.{format}")
                     try:
-                        output = (part_data if format == "svg" else ingest.png_bytes(render_svg(part_data)) if format == "png"
-                                  else exporter.convert(part_data, format, self.settings.tool_timeout_seconds, p.settings.export_mode))
+                        output = (
+                            part_data
+                            if format == "svg"
+                            else exporter.rasterize_png(
+                                part_data,
+                                dpi=300,
+                                timeout=self.settings.tool_timeout_seconds,
+                                mode=p.settings.export_mode,
+                                max_pixels=self.settings.max_export_pixels,
+                            )
+                            if format == "png"
+                            else exporter.convert(
+                                part_data,
+                                format,
+                                self.settings.tool_timeout_seconds,
+                                p.settings.export_mode,
+                            )
+                        )
                         self.storage.put(key, output)
                         part.exports[format] = key
                         p.usage["export_operations"] += 1

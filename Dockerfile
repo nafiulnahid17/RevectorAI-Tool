@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 INKSCAPE_PROFILE_DIR=/tmp/revector-inkscape
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    inkscape potrace tesseract-ocr fonts-dejavu-core \
+    inkscape potrace tesseract-ocr fonts-dejavu-core ghostscript poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /engine
 COPY pyproject.toml requirements.txt ./
