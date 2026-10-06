@@ -19,6 +19,8 @@ from app.pipeline import geometry, hybrid_detection, segmentation
 
 
 PREPARE_VERSION = "prepare/2.3-stable-699ac010-r1"
+DEFAULT_PART_WIDTH_MM = 558.8
+DEFAULT_PART_HEIGHT_MM = 787.4
 
 
 def _normalize_generated_size(
@@ -302,6 +304,9 @@ class ProductionWorkflow:
                         "Each nonblank slot requires a confirmed part of the matching type",
                         status=409,
                     )
+                if part.physical_width_mm is None:
+                    part.physical_width_mm = DEFAULT_PART_WIDTH_MM
+                    part.physical_height_mm = DEFAULT_PART_HEIGHT_MM
                 if part.part_id in ids:
                     raise EngineError(
                         "PART_REVIEW_REQUIRED",

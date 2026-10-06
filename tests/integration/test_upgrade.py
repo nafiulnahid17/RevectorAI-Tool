@@ -113,6 +113,14 @@ def test_new_project_default_mockup_canvas_is_four_three():
     assert (settings.mockup_width, settings.mockup_height) == (1536, 1152)
 
 
+def test_review_applies_client_default_physical_dimensions(tmp_path):
+    e, p = prepared(tmp_path)
+    confirm(e, p)
+    current = e.load(p.project_id)
+    assert all(part.physical_width_mm == 558.8 for part in current.parts)
+    assert all(part.physical_height_mm == 787.4 for part in current.parts)
+
+
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e, p = prepared(tmp_path)
     assert len(p.parts) == 8 and set(p.slots) == set(SLOTS)
