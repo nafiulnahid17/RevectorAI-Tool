@@ -225,23 +225,94 @@ def _run_ghostscript_cmyk(
         )
 
 
-def _verify_eps_level2_profile(path: Path) -> None:
-    header = path.read_bytes()[:16384].decode("latin-1", errors="replace")
+def _svg_page_points(data: bytes) -> tuple[float, float] | None:
+    root = SafeET.fromstring(data)
+    width_in = _physical_inches(root.get("width", ""))
+    height_in = _physical_inches(root.get("height", ""))
+    if not width_in or not height_in:
+        return None
+    return width_in * 72.0, height_in * 72.0
+
+
+def _verify_eps_level2_profile(
+    path: Path,
+    expected_points: tuple[float, float] | None = None,
+) -> None:
+    header = path.read_bytes()[:131072].decode("latin-1", errors="replace")
     first_line = header.splitlines()[0] if header else ""
     if "EPSF-3.0" not in first_line:
         raise EngineError(
             "EXPORT_PROFILE_MISMATCH",
             "EPS output is not EPSF 3.0",
         )
-    if "%%LanguageLevel: 2" not in header:
+    if not re.search(r"^%%LanguageLevel:\s*2\s*$", header, re.MULTILINE):
         raise EngineError(
             "EXPORT_PROFILE_MISMATCH",
             "EPS output is not PostScript LanguageLevel 2",
         )
-    if "%%BoundingBox:" not in header:
+    match = re.search(
+        r"^%%BoundingBox:\s*(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s*$",
+        header,
+        re.MULTILINE,
+    )
+    if not match:
         raise EngineError(
             "EXPORT_PROFILE_MISMATCH",
-            "EPS output is missing a production BoundingBox",
+            "EPS output is missing a numeric production BoundingBox",
+        )
+    if expected_points:
+        llx, lly, urx, ury = map(float, match.groups())
+        actual = (urx - llx, ury - lly)
+        if any(abs(a - e) > 2.0 for a, e in zip(actual, expected_points)):
+            raise EngineError(
+                "EXPORT_DIMENSION_MISMATCH",
+                "EPS BoundingBox does not match the SVG physical production size",
+                diagnostics={
+                    "expected_points": [round(v, 3) for v in expected_points],
+                    "actual_points": [round(v, 3) for v in actual],
+                },
+            )
+
+
+def _verify_pdf_page_size(
+    path: Path,
+    expected_points: tuple[float, float] | None,
+    timeout: int,
+) -> None:
+    if not expected_points:
+        return
+    pdfinfo = shutil.which("pdfinfo")
+    if not pdfinfo:
+        raise EngineError(
+            "EXPORT_VALIDATION_UNAVAILABLE",
+            "Poppler pdfinfo is required to verify physical PDF dimensions",
+        )
+    result = subprocess.run(
+        [pdfinfo, str(path)],
+        check=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+    text = result.stdout.decode("utf-8", errors="replace")
+    match = re.search(
+        r"^Page size:\s*([0-9.]+)\s+x\s+([0-9.]+)\s+pts",
+        text,
+        re.MULTILINE,
+    )
+    if not match:
+        raise EngineError(
+            "EXPORT_DIMENSION_MISMATCH",
+            "PDF page size could not be verified",
+        )
+    actual = tuple(map(float, match.groups()))
+    if any(abs(a - e) > 1.0 for a, e in zip(actual, expected_points)):
+        raise EngineError(
+            "EXPORT_DIMENSION_MISMATCH",
+            "PDF page size does not match the SVG physical production size",
+            diagnostics={
+                "expected_points": [round(v, 3) for v in expected_points],
+                "actual_points": [round(v, 3) for v in actual],
+            },
         )
 
 
@@ -257,6 +328,7 @@ def convert(
     if format not in {"pdf", "eps"}:
         raise EngineError("UNSUPPORTED_EXPORT", "Production export supports PDF/EPS only")
     approve(data, mode)
+    expected_points = _svg_page_points(data)
 
     inkscape = shutil.which("inkscape")
     if not inkscape:
@@ -303,7 +375,9 @@ def convert(
                     "Conversion did not produce a valid output signature",
                 )
             if format == "eps":
-                _verify_eps_level2_profile(output)
+                _verify_eps_level2_profile(output, expected_points)
+            else:
+                _verify_pdf_page_size(output, expected_points, timeout)
             verify_conversion(output, format, timeout, mode)
             return exported
         except EngineError:
