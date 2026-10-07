@@ -35,7 +35,8 @@ class SlotDecision(StrictModel):
 
 
 class ReviewRequest(StageRequest):
-    decisions: dict[SlotType, SlotDecision]
+    decisions: dict[SlotType, SlotDecision] = Field(default_factory=dict)
+    part_ids: list[str] | None = Field(None, min_length=1, max_length=100)
 
 
 class SlotRequest(StageRequest):
@@ -145,10 +146,18 @@ def missing(body: MissingRequest, request: Request):
 def review(body: ReviewRequest, request: Request):
     project_access(request, body.project_id)
     request.app.state.queue.assert_idle(body.project_id)
-    request.app.state.engine.workflow.review(
-        body.project_id, {k: v.model_dump() for k, v in body.decisions.items()}
+    decisions = {k: v.model_dump() for k, v in body.decisions.items()}
+    reviewed = request.app.state.engine.workflow.review(
+        body.project_id,
+        decisions,
+        selected_part_ids=body.part_ids,
     )
-    return request.app.state.queue.submit(body.project_id, "production", {})
+    selected = body.part_ids or reviewed.ai_metadata.get("review", {}).get("selected_part_ids") or []
+    return request.app.state.queue.submit(
+        body.project_id,
+        "production",
+        {"part_ids": selected},
+    )
 
 
 @router.post("/slots/update")
