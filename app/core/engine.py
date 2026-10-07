@@ -77,9 +77,10 @@ class Engine:
         return project
 
     def load(self, project_id: str) -> Project:
-        p=self.storage.load(project_id)
-        p.exports={k:v for k,v in p.exports.items() if k.startswith('selected_zip_')} if p.stage_metadata.get('export_policy')=='parts_only_v1' else {}
-        return p
+        # Export manifests are already invalidated whenever vectors/validation change.
+        # Never strip current selected-files/production-pack keys on read; doing so
+        # makes a successfully generated ZIP immediately unreachable by /artifacts.
+        return self.storage.load(project_id)
 
     def key(self, project: Project, suffix: str) -> str:
         return f"projects/{project.project_id}/{suffix}"
@@ -334,11 +335,28 @@ class Engine:
 
     def selected(self, p, params) -> list[Part]:
         self.require(bool(p.parts), "Segment artwork first")
-        if params.get("part_id"):
-            matches = [part for part in p.parts if part.part_id == params["part_id"]]
-            if not matches:
-                raise EngineError("PART_NOT_FOUND", "Part does not exist", status=404)
-            return matches
+        part_id = params.get("part_id")
+        part_ids = params.get("part_ids")
+        if part_id and part_ids:
+            raise EngineError(
+                "INVALID_PART_SELECTION",
+                "Use part_id or part_ids, not both",
+                status=422,
+            )
+        if part_id:
+            part_ids = [part_id]
+        if part_ids:
+            ordered = list(dict.fromkeys(part_ids))
+            by_id = {part.part_id: part for part in p.parts}
+            missing = [item for item in ordered if item not in by_id]
+            if missing:
+                raise EngineError(
+                    "PART_NOT_FOUND",
+                    "Selected part does not exist",
+                    status=404,
+                    diagnostics={"part_ids": missing},
+                )
+            return [by_id[item] for item in ordered]
         return p.parts
 
     def stage_reconstruct(self, p, params, cancelled):
