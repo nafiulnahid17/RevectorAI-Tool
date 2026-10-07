@@ -529,25 +529,82 @@ class Engine:
         return {"parts": results, "cached": all(r.get("cached") for r in results.values())}
 
     def stage_compose(self, p, params, cancelled):
-        self.require(bool(p.parts) and all(part.vector and part.cache.get("optimize") for part in p.parts),
-                     "Optimize every current part before composing")
-        signature = digest([[part.model_dump(exclude={"cache", "warnings", "metrics", "validation", "previews", "processing_state", "error"}), self.file_hash(part.vector)]
-                            for part in p.parts] + [p.settings.known_width_mm, p.settings.bleed_mm, p.settings.safe_zone_mm])
+        parts = self.selected(p, params)
+        self.require(
+            bool(parts) and all(part.vector and part.cache.get("optimize") for part in parts),
+            "Optimize every selected part before composing",
+        )
+        selected_ids = [part.part_id for part in parts]
+        signature = digest(
+            [
+                [
+                    part.model_dump(
+                        exclude={
+                            "cache",
+                            "warnings",
+                            "metrics",
+                            "validation",
+                            "previews",
+                            "processing_state",
+                            "error",
+                        }
+                    ),
+                    self.file_hash(part.vector),
+                ]
+                for part in parts
+            ]
+            + [
+                selected_ids,
+                p.settings.known_width_mm,
+                p.settings.bleed_mm,
+                p.settings.safe_zone_mm,
+            ]
+        )
         if self._cached(p, "compose", signature):
-            return {"cached": True}
+            return {
+                "cached": True,
+                "selected_part_ids": selected_ids,
+                "selected_count": len(selected_ids),
+            }
+
         self.invalidate(p, "compose")
-        vectors = [(part, SafeET.fromstring(self.storage.get(part.vector)),
-                    np.asarray(self.image(part.mask).getchannel("R"))) for part in p.parts]
+        vectors = [
+            (
+                part,
+                SafeET.fromstring(self.storage.get(part.vector)),
+                np.asarray(self.image(part.mask).getchannel("R")),
+            )
+            for part in parts
+        ]
         data = compose(p, vectors, tuple(p.geometry["output_dimensions"]))
         p.master_svg = self.key(p, "vectors/master.svg")
         self.storage.put(p.master_svg, data)
+
         part_outputs = []
         for part, root, mask in vectors:
             key = self.key(p, f"vectors/{part.part_id}.svg")
-            self.storage.put(key, compose(p, [(part, root, mask)], part.bbox[2:], single_part=True))
+            self.storage.put(
+                key,
+                compose(p, [(part, root, mask)], part.bbox[2:], single_part=True),
+            )
             part_outputs.append(key)
+
         self.record_cache(p, "compose", signature, [p.master_svg, *part_outputs])
-        return {"master_svg": p.master_svg, "part_files": part_outputs, "dimensions": "calibrated" if p.settings.known_width_mm else "uncalibrated"}
+        p.stage_metadata["compose_selection"] = {
+            "part_ids": selected_ids,
+            "count": len(selected_ids),
+            "dynamic_selection": True,
+        }
+        return {
+            "master_svg": p.master_svg,
+            "part_files": part_outputs,
+            "selected_part_ids": selected_ids,
+            "selected_count": len(selected_ids),
+            "dimensions": "calibrated"
+            if all(part.physical_width_mm for part in parts)
+            else "mixed_or_uncalibrated",
+        }
+
 
     def stage_validate(self, p, params, cancelled):
         self.require(bool(p.master_svg), "Compose the master SVG first")
