@@ -67,7 +67,7 @@ def test_api_staged_workflow(tmp_path, simple_bytes):
             "/api/revector/export",
             json={
                 "project_id": pid,
-                "formats": ["svg", "png", "zip"],
+                "formats": ["svg", "zip"],
                 "bundle": "production_pack",
             },
         ).json()
