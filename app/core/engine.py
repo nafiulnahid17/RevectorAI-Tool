@@ -607,41 +607,133 @@ class Engine:
 
 
     def stage_validate(self, p, params, cancelled):
-        self.require(bool(p.master_svg), "Compose the master SVG first")
+        self.require(bool(p.master_svg), "Compose the selected vector set first")
+        compose_ids = (
+            p.stage_metadata.get("compose_selection", {}).get("part_ids")
+            or p.stage_metadata.get("compose", {}).get("selected_part_ids")
+            or []
+        )
+        requested_ids = params.get("part_ids") or compose_ids
+        parts = self.selected(p, {"part_ids": requested_ids} if requested_ids else {})
+        selected_ids = [part.part_id for part in parts]
+        if compose_ids and selected_ids != list(compose_ids):
+            raise EngineError(
+                "STALE_COMPOSITION",
+                "Selected parts changed after composition; compose the new selection first",
+                status=409,
+            )
+
         data = self.storage.get(p.master_svg)
-        report = validate_svg(data, max_bytes=self.settings.max_svg_bytes, max_pixels=self.settings.max_pixels)
-        p.validation = report
+        report = validate_svg(
+            data,
+            max_bytes=self.settings.max_svg_bytes,
+            max_pixels=self.settings.max_pixels,
+        )
         report["validated_sha256"] = hashlib.sha256(data).hexdigest()
+        report["selected_part_ids"] = selected_ids
+        report["selected_count"] = len(selected_ids)
+        report["resolution_independent"] = bool(
+            report.get("true_vector") and report.get("embedded_rasters") == 0
+        )
+        report["vector_output_policy"] = (
+            "Resolution-independent vector geometry; DPI applies only to raster proof exports."
+        )
+        p.validation = report
+
         if not report["valid_svg"]:
             raise EngineError("SVG_VALIDATION_FAILED", "; ".join(report["errors"][:5]))
         if report["embedded_rasters"] and p.settings.export_mode == "true_vector":
-            raise EngineError("RASTER_FOUND_IN_TRUE_VECTOR", "Raster detected in True Vector project")
-        if not report["meaningful_shape_count"] or report["illustrator_compatibility"] == "FAIL":
-            raise EngineError("SVG_VALIDATION_FAILED", "No meaningful vector artwork or incompatible SVG")
+            raise EngineError(
+                "RASTER_FOUND_IN_TRUE_VECTOR",
+                "Raster detected in True Vector project",
+            )
+        if (
+            not report["meaningful_shape_count"]
+            or report["illustrator_compatibility"] == "FAIL"
+        ):
+            raise EngineError(
+                "SVG_VALIDATION_FAILED",
+                "No meaningful vector artwork or incompatible SVG",
+            )
+
         size = tuple(p.geometry["output_dimensions"])
         vector = render_svg(data, *size)
         reference = Image.new("RGBA", size)
-        for part in p.parts:
-            reference.alpha_composite(self.image(part.clean_reference), part.bbox[:2])
+        for part in parts:
+            if part.clean_reference:
+                reference.alpha_composite(self.image(part.clean_reference), part.bbox[:2])
         metrics, difference = compare(reference, vector)
         report["render_succeeded"] = True
         report["visual_comparison"] = metrics
-        # No pixel-fidelity promise: difficult input and aggressive cleanup need review.
         if metrics["ssim"] is not None and metrics["ssim"] < .85:
-            report["warnings"].append("Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production.")
+            report["warnings"].append(
+                "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+            )
             report["illustrator_compatibility"] = "PASS_WITH_WARNINGS"
+
         report["parts"] = []
-        for part in p.parts:
-            part_data = self.storage.get(self.key(p, f"vectors/{part.part_id}.svg"))
+        failures = []
+        for part in parts:
+            if cancelled():
+                raise EngineError("JOB_CANCELLED", "Validation cancelled")
+            part_key = self.key(p, f"vectors/{part.part_id}.svg")
+            if not self.storage.exists(part_key):
+                failures.append(
+                    {
+                        "part_id": part.part_id,
+                        "part_type": part.type,
+                        "error_code": "VECTOR_NOT_FOUND",
+                        "message": "Selected part vector is missing",
+                    }
+                )
+                continue
+
+            part_data = self.storage.get(part_key)
             part_report = validate_svg(part_data)
-            if not part_report["true_vector"]:
-                raise EngineError("SVG_VALIDATION_FAILED", "A composed part did not pass True Vector validation")
-            part_render = render_svg(part_data, part.bbox[2], part.bbox[3])
-            part_diff, _ = compare(self.image(part.clean_reference), part_render)
+            if not part_report["true_vector"] or part_report.get("embedded_rasters"):
+                failures.append(
+                    {
+                        "part_id": part.part_id,
+                        "part_type": part.type,
+                        "error_code": "TRUE_VECTOR_VALIDATION_FAILED",
+                        "message": "Part contains invalid or raster-backed vector content",
+                    }
+                )
+                continue
+
+            if part.type in {"front_body", "back_body"} and (
+                abs((part.physical_width_mm or 0) - 558.8) > 0.01
+                or abs((part.physical_height_mm or 0) - 787.4) > 0.01
+            ):
+                failures.append(
+                    {
+                        "part_id": part.part_id,
+                        "part_type": part.type,
+                        "error_code": "CLIENT_DIMENSION_MISMATCH",
+                        "message": "Front/Back Body must be exactly 558.8 × 787.4 mm",
+                    }
+                )
+                continue
+
+            try:
+                part_render = render_svg(part_data, part.bbox[2], part.bbox[3])
+                part_diff, _ = compare(self.image(part.clean_reference), part_render)
+            except Exception:
+                failures.append(
+                    {
+                        "part_id": part.part_id,
+                        "part_type": part.type,
+                        "error_code": "SVG_RENDER_FAILED",
+                        "message": "Selected part could not be rendered for validation",
+                    }
+                )
+                continue
+
             trace_backend = part.metrics.get("backend")
             production_quality = (
                 "PASS"
-                if trace_backend == "vtracer" and not part.metrics.get("explicit_fallback_trace")
+                if trace_backend == "vtracer"
+                and not part.metrics.get("explicit_fallback_trace")
                 else "REVIEW_REQUIRED"
             )
             part.validation = {
@@ -650,28 +742,74 @@ class Engine:
                 "validated_sha256": hashlib.sha256(part_data).hexdigest(),
                 "trace_backend": trace_backend,
                 "production_quality": production_quality,
-                "pathfinder_hierarchy": part.metrics.get("trace_metadata", {}).get("hierarchy"),
+                "pathfinder_hierarchy": part.metrics.get("trace_metadata", {}).get(
+                    "hierarchy"
+                ),
                 "ocr_objects": len(part.ocr_results),
+                "resolution_independent": True,
+                "physical_width_mm": part.physical_width_mm,
+                "physical_height_mm": part.physical_height_mm,
             }
             if production_quality != "PASS":
-                part.validation["warnings"] = list(part.validation.get("warnings", [])) + [
+                part.validation["warnings"] = list(
+                    part.validation.get("warnings", [])
+                ) + [
                     "Production used an explicit/fallback contour trace; review paths before manufacturing."
                 ]
+
             diagnostic_data, diagnostic_nodes = diagnostic(part_data)
-            diagnostic_key = self.key(p,f'previews/{part.part_id}-paths.svg')
-            self.storage.put(diagnostic_key,diagnostic_data)
-            part.previews['vector_view']=diagnostic_key
+            diagnostic_key = self.key(p, f"previews/{part.part_id}-paths.svg")
+            self.storage.put(diagnostic_key, diagnostic_data)
+            part.previews["vector_view"] = diagnostic_key
             part.metrics["visual_difference"] = part_diff
-            report["parts"].append({"part_id": part.part_id, "part": part.type, "paths": part_report["path_count"],
-                                    "anchors": part_report["total_anchor_count"], "rasters": part_report["embedded_rasters"], "status": "PASS",
-                                    "validated_sha256": hashlib.sha256(part_data).hexdigest(),
-                                    "physical_width_mm": part.physical_width_mm, "physical_height_mm": part.physical_height_mm,
-                                    "trace_backend": part.validation.get("trace_backend"),
-                                    "production_quality": part.validation.get("production_quality"),
-                                    "ocr_objects": part.validation.get("ocr_objects", 0)})
-        p.previews = {"reference": self.put_image(self.key(p, "previews/reference.png"), reference),
-                      "vector_render": self.put_image(self.key(p, "previews/vector_render.png"), vector),
-                      "difference": self.put_image(self.key(p, "previews/difference.png"), difference)}
+            report["parts"].append(
+                {
+                    "part_id": part.part_id,
+                    "part": part.type,
+                    "paths": part_report["path_count"],
+                    "anchors": part_report["total_anchor_count"],
+                    "rasters": part_report["embedded_rasters"],
+                    "status": "PASS",
+                    "validated_sha256": hashlib.sha256(part_data).hexdigest(),
+                    "physical_width_mm": part.physical_width_mm,
+                    "physical_height_mm": part.physical_height_mm,
+                    "trace_backend": part.validation.get("trace_backend"),
+                    "production_quality": part.validation.get("production_quality"),
+                    "ocr_objects": part.validation.get("ocr_objects", 0),
+                    "resolution_independent": True,
+                }
+            )
+
+        if failures:
+            report["status"] = "FAIL"
+            report["failed_parts"] = failures
+            report["passed_part_ids"] = [
+                entry["part_id"] for entry in report["parts"] if entry["status"] == "PASS"
+            ]
+            p.validation = report
+            self.storage.save(p)
+            self.storage.json(self.key(p, "reports/validation.json"), report)
+            raise EngineError(
+                "PART_VALIDATION_FAILED",
+                "One or more selected parts failed validation. Fix, review or exclude failed parts, then continue.",
+                diagnostics={
+                    "parts": failures,
+                    "passed_part_ids": report["passed_part_ids"],
+                    "selected_part_ids": selected_ids,
+                },
+            )
+
+        p.previews = {
+            "reference": self.put_image(
+                self.key(p, "previews/reference.png"), reference
+            ),
+            "vector_render": self.put_image(
+                self.key(p, "previews/vector_render.png"), vector
+            ),
+            "difference": self.put_image(
+                self.key(p, "previews/difference.png"), difference
+            ),
+        }
         view_data, nodes = diagnostic(data)
         view_key = self.key(p, "previews/vector_view.svg")
         self.storage.put(view_key, view_data)
@@ -679,14 +817,24 @@ class Engine:
         nodes_key = self.key(p, "reports/nodes.json")
         self.storage.json(nodes_key, nodes)
         p.previews["nodes"] = nodes_key
-        report.update(status="PASS",vector_status=report["status"],vector_paths=report["path_count"],editable_objects=report["shape_count"],geometry_integrity="PASS")
+        report.update(
+            status="PASS",
+            vector_status=report["status"],
+            vector_paths=report["path_count"],
+            editable_objects=report["shape_count"],
+            geometry_integrity="PASS",
+            failed_parts=[],
+            passed_part_ids=selected_ids,
+        )
         report["file_size_bytes"] = len(data)
         p.state = State.VALIDATED
+        p.validation = report
         self.storage.save(p)
         self.storage.json(self.key(p, "reports/validation.json"), report)
         p.usage["output_paths"] = report["path_count"]
         p.usage["output_anchors"] = report["total_anchor_count"]
         return {"validation": report}
+
 
     def stage_export(self, p, params, cancelled):
         self.require(p.state == State.READY and bool(p.validation and p.validation.get("render_succeeded")),
