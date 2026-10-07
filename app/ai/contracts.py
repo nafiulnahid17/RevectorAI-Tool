@@ -29,7 +29,10 @@ SlotType = Literal[
 
 class Candidate(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-    part_type: SlotType
+    # Dynamic semantic label. Standard SLOTS are preferred when applicable,
+    # but extra garment components must not be discarded just because they are
+    # outside the legacy eight-slot template.
+    part_type: str = Field(min_length=1, max_length=64, pattern=r"^[A-Z0-9_]+$")
     candidate_bbox: tuple[float, float, float, float] = Field(
         description="Normalized x,y,width,height in [0,1]"
     )
@@ -57,10 +60,10 @@ class TextRegionEvidence(BaseModel):
 class ArtworkAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     artwork_type: str = "unknown"
-    expected_parts: list[SlotType] = Field(default_factory=lambda: list(SLOTS))
-    visible_parts: list[SlotType] = Field(default_factory=list)
-    missing_parts: list[SlotType] = Field(default_factory=list)
-    uncertain_parts: list[SlotType] = Field(default_factory=list)
+    expected_parts: list[str] = Field(default_factory=lambda: list(SLOTS), max_length=64)
+    visible_parts: list[str] = Field(default_factory=list, max_length=64)
+    missing_parts: list[str] = Field(default_factory=list, max_length=64)
+    uncertain_parts: list[str] = Field(default_factory=list, max_length=64)
     dominant_colors: list[str] = Field(default_factory=list, max_length=64)
     logos: list[LogoEvidence] = Field(default_factory=list, max_length=100)
     text_regions: list[TextRegionEvidence] = Field(default_factory=list, max_length=100)
@@ -79,8 +82,8 @@ class MockupQC(BaseModel):
     pass_qc: bool = False
     serious_failure: bool = False
     component_count: int = Field(0, ge=0, le=32)
-    missing_parts: list[SlotType] = Field(default_factory=list)
-    duplicate_parts: list[SlotType] = Field(default_factory=list)
+    missing_parts: list[str] = Field(default_factory=list, max_length=64)
+    duplicate_parts: list[str] = Field(default_factory=list, max_length=64)
     extra_components: list[str] = Field(default_factory=list, max_length=32)
     attached_collar: bool = False
     attached_sleeve: bool = False
