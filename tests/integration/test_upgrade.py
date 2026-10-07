@@ -125,6 +125,28 @@ def test_review_applies_client_default_physical_dimensions(tmp_path):
     assert all(part.physical_width_mm is None and part.physical_height_mm is None for part in non_bodies)
 
 
+def test_detected_parts_auto_ready_but_reconstructed_part_requires_confirmation(tmp_path):
+    e, p = prepared(tmp_path)
+    detected = p.parts[0]
+    assert detected.source == "engine_refined" and not detected.confirmed
+
+    reviewed = e.workflow.review(p.project_id, {}, [detected.part_id])
+    selected = next(part for part in reviewed.parts if part.part_id == detected.part_id)
+    assert selected.part_id == detected.part_id
+
+    # A missing part reconstructed by AI is inferred geometry and still needs
+    # explicit human confirmation before it can enter production.
+    e.manual(p.project_id, "remove", detected.part_id, {})
+    slot = detected.type.upper()
+    e.run(p.project_id, "ai-missing", {"slot": slot})
+    current = e.load(p.project_id)
+    restored = next(part for part in current.parts if part.type == detected.type)
+    assert restored.source == "ai_reconstructed" and not restored.confirmed
+    with pytest.raises(EngineError) as caught:
+        e.workflow.review(p.project_id, {}, [restored.part_id])
+    assert caught.value.code == "PART_REVIEW_REQUIRED"
+
+
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e, p = prepared(tmp_path)
     assert len(p.parts) == 8 and set(p.slots) == set(SLOTS)
