@@ -41,7 +41,7 @@ class MockArtworkProvider:
         return sheet()[0]
 
     def create_pattern_mockup(self, image, prompt, size):
-        assert "NO DOUBLE COLLARS" in prompt
+        assert "Do NOT force an eight-part template" in prompt
         return sheet()[0]
 
     def identify_parts(self, image):
@@ -75,12 +75,19 @@ def prepared(tmp_path):
     return e, e.load(p.project_id)
 
 
-def confirm(e, p):
+def confirm(e, p, selected=None):
+    chosen = list(selected or p.parts)
     decisions = {}
-    for a in p.parts:
-        e.manual(p.project_id, "confirm", a.part_id, {})
-        decisions[a.type.upper()] = {"status": "confirmed", "part_id": a.part_id}
-    e.workflow.review(p.project_id, decisions)
+    ids = []
+    for a in chosen:
+        changes = {"confirmed": True}
+        if a.type not in {"front_body", "back_body"}:
+            changes.update(physical_width_mm=250.0, physical_height_mm=350.0)
+        e.manual(p.project_id, "update", a.part_id, changes)
+        ids.append(a.part_id)
+        if a.type.upper() in SLOTS:
+            decisions[a.type.upper()] = {"status": "confirmed", "part_id": a.part_id}
+    e.workflow.review(p.project_id, ids, decisions)
 
 
 def test_provider_supported_four_three_mockup_is_accepted_for_legacy_three_two_settings(tmp_path):
@@ -113,12 +120,45 @@ def test_new_project_default_mockup_canvas_is_four_three():
     assert (settings.mockup_width, settings.mockup_height) == (1536, 1152)
 
 
-def test_review_applies_client_default_physical_dimensions(tmp_path):
+def test_review_locks_client_body_dimensions_only(tmp_path):
     e, p = prepared(tmp_path)
     confirm(e, p)
     current = e.load(p.project_id)
-    assert all(part.physical_width_mm == 558.8 for part in current.parts)
-    assert all(part.physical_height_mm == 787.4 for part in current.parts)
+    body = [part for part in current.parts if part.type in {"front_body", "back_body"}]
+    others = [part for part in current.parts if part.type not in {"front_body", "back_body"}]
+    assert body and all(part.physical_width_mm == 558.8 for part in body)
+    assert all(part.physical_height_mm == 787.4 for part in body)
+    assert others and all(part.physical_width_mm == 250.0 for part in others)
+    assert all(part.physical_height_mm == 350.0 for part in others)
+
+
+def test_two_selected_parts_do_not_require_eight_part_confirmation(tmp_path):
+    e, p = prepared(tmp_path)
+    selected = [
+        next(part for part in p.parts if part.type == "front_body"),
+        next(part for part in p.parts if part.type == "back_body"),
+    ]
+    confirm(e, p, selected)
+    untouched = [part for part in e.load(p.project_id).parts if part.part_id not in {x.part_id for x in selected}]
+    assert untouched and all(not part.confirmed for part in untouched)
+
+    e.run(p.project_id, "production")
+    current = e.load(p.project_id)
+    assert current.true_vector_ready
+    assert current.validation["selected_part_ids"] == [part.part_id for part in selected]
+    assert len(current.validation["parts"]) == 2
+    assert all(entry["resolution_independent"] for entry in current.validation["parts"])
+
+    result = e.run(
+        p.project_id,
+        "export",
+        {
+            "part_ids": [part.part_id for part in selected],
+            "formats": ["svg", "zip"],
+            "bundle": "production_pack",
+        },
+    )
+    assert len(result["part_files"]) == 2
 
 
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
@@ -132,7 +172,11 @@ def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e.run(p.project_id, "production")
     p = e.load(p.project_id)
     assert p.true_vector_ready and p.validation["embedded_rasters"] == 0
-    result = e.run(p.project_id, "export", {"formats": ["svg", "zip"]})
+    result = e.run(
+        p.project_id,
+        "export",
+        {"formats": ["svg", "zip"], "bundle": "production_pack"},
+    )
     assert len(result["part_files"]) == 8 and set(result["exports"]) == {"zip"}
     archive = zipfile.ZipFile(BytesIO(e.storage.get(result["exports"]["zip"])))
     assert sum(name.startswith("parts/") for name in archive.namelist()) == 8
@@ -258,10 +302,15 @@ def test_blank_missing_slot_never_fabricates_geometry(tmp_path, slot):
     e.manual(p.project_id, "remove", removed.part_id, {})
     p = e.load(p.project_id)
     decisions = {slot: {"status": "blank"}}
+    ids = []
     for a in p.parts:
-        e.manual(p.project_id, "confirm", a.part_id, {})
+        changes = {"confirmed": True}
+        if a.type not in {"front_body", "back_body"}:
+            changes.update(physical_width_mm=250.0, physical_height_mm=350.0)
+        e.manual(p.project_id, "update", a.part_id, changes)
+        ids.append(a.part_id)
         decisions[a.type.upper()] = {"status": "confirmed", "part_id": a.part_id}
-    e.workflow.review(p.project_id, decisions)
+    e.workflow.review(p.project_id, ids, decisions)
     p = e.load(p.project_id)
     assert len(p.parts) == 7 and p.slots[slot].status == "blank"
     assert p.slots[slot].part_id is None
