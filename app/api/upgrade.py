@@ -22,6 +22,7 @@ router = APIRouter(
 
 class RecoveryRequest(StageRequest):
     fallback_trace: bool = False
+    part_ids: list[str] | None = Field(None, min_length=1, max_length=100)
 
 
 class MissingRequest(StageRequest):
