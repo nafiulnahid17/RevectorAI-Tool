@@ -81,8 +81,8 @@ def mockup_runtime_prompt(
         + f"\n\nRUNTIME SETTINGS (trusted): background={background}; "
         f"quality={quality}; target_dimensions={requested_dimensions[0]}x{requested_dimensions[1]}; "
         "aspect_ratio=4:3 landscape.\n"
-        "REFERENCE SHEET ORDER: uploaded Original Image on the LEFT and its Enhanced Image "
-        "on the RIGHT. They are the only design sources.\n"
+        "The supplied image is the enhanced artwork reference for this run. It is the "
+        "only visual source for the dynamic separated-component mockup.\n"
         "The following analysis is advisory metadata only; never use it to invent visual "
-        f"details that are not supported by those two images:\n{advisory}"
+        f"details that are not supported by the supplied image:\n{advisory}"
     )
