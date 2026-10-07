@@ -131,3 +131,24 @@ def test_selected_files_zip_is_distinct_from_production_pack(engine):
         assert any(name.startswith('metadata/') for name in names)
         assert any(name.startswith('previews/') for name in names)
         assert 'README.txt' in names
+
+
+def test_selected_bundle_remains_in_manifest_for_download(tmp_path, simple_bytes):
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path, sync_jobs=True))) as client:
+        engine = client.app.state.engine
+        p = complete(engine)
+        ids = [p.parts[0].part_id]
+        result = engine.run(
+            p.project_id,
+            "export",
+            {"part_ids": ids, "formats": ["svg", "zip"], "bundle": "selected_files"},
+        )
+        key = result["exports"]["zip"]
+        public = client.get(f"/api/revector/projects/{p.project_id}").json()
+        assert key in public["exports"].values()
+        relative = key.split(p.project_id + "/", 1)[1]
+        response = client.get(
+            f"/api/revector/projects/{p.project_id}/artifacts/{relative}"
+        )
+        assert response.status_code == 200
+        assert response.content.startswith(b"PK")
