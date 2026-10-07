@@ -412,7 +412,11 @@ class ProductionWorkflow:
                 status=409,
             )
 
-        requested_ids = params.get("part_ids") or review.get("selected_part_ids")
+        requested_ids = (
+            [params["part_id"]]
+            if params.get("part_id")
+            else params.get("part_ids") or review.get("selected_part_ids")
+        )
         if not requested_ids:
             raise EngineError(
                 "PART_REVIEW_REQUIRED",
