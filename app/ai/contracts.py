@@ -98,10 +98,10 @@ class MockupQC(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     pass_qc: bool = False
     serious_failure: bool = False
-    component_count: int = Field(0, ge=0, le=32)
+    component_count: int = Field(0, ge=0, le=100)
     missing_parts: list[DetectedPartType] = Field(default_factory=list)
     duplicate_parts: list[DetectedPartType] = Field(default_factory=list)
-    extra_components: list[str] = Field(default_factory=list, max_length=32)
+    extra_components: list[str] = Field(default_factory=list, max_length=100)
     attached_collar: bool = False
     attached_sleeve: bool = False
     left_right_mixup: bool = False
