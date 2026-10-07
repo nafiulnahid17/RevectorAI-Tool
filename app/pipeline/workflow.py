@@ -388,16 +388,27 @@ class ProductionWorkflow:
         e = self.engine
         p = e.load(pid)
         review = p.ai_metadata.get("review", {})
-        selected_ids = params.get("part_ids") or review.get("selected_part_ids") or []
-        if not review.get("confirmed") or not selected_ids:
+        review_ids = list(review.get("selected_part_ids") or [])
+        requested_ids = (
+            list(params.get("part_ids") or [])
+            or ([params["part_id"]] if params.get("part_id") else [])
+            or review_ids
+        )
+        if not review.get("confirmed") or not review_ids or not requested_ids:
             raise EngineError(
                 "PART_REVIEW_REQUIRED",
                 "Confirm at least one selected component before automatic production",
                 status=409,
             )
+        if any(part_id not in set(review_ids) for part_id in requested_ids):
+            raise EngineError(
+                "PART_REVIEW_REQUIRED",
+                "Recovery/production can only process parts in the current confirmed selection",
+                status=409,
+            )
 
-        params = {**params, "part_ids": selected_ids}
-        parts = e.selected(p, params)
+        selected_ids = requested_ids
+        parts = e.selected(p, {"part_ids": selected_ids})
         failures = []
         for part in parts:
             if cancelled():
@@ -464,7 +475,7 @@ class ProductionWorkflow:
             )
 
         current = e.load(pid)
-        selected_current = [a for a in current.parts if a.part_id in set(selected_ids)]
+        selected_current = [a for a in current.parts if a.part_id in set(review_ids)]
         if any(
             not a.vector or not a.cache.get("optimize") or a.error
             for a in selected_current
@@ -474,7 +485,9 @@ class ProductionWorkflow:
                 "A selected component still requires vector recovery",
             )
 
-        stage_params = {"part_ids": selected_ids}
+        # A single-part recovery only retraces that part, then recomposes and
+        # revalidates the whole current confirmed selection.
+        stage_params = {"part_ids": review_ids}
         e.run(
             pid,
             "compose",
@@ -494,8 +507,8 @@ class ProductionWorkflow:
         except EngineError:
             self.event(pid, "VALIDATION_FAILED")
             raise
-        self.event(pid, "VALIDATION_PASSED", selected_part_ids=selected_ids)
-        self.event(pid, "EXPORT_READY", selected_part_ids=selected_ids)
+        self.event(pid, "VALIDATION_PASSED", selected_part_ids=review_ids)
+        self.event(pid, "EXPORT_READY", selected_part_ids=review_ids)
         return result
 
     def missing(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:
