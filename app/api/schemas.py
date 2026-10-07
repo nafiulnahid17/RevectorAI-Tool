@@ -18,6 +18,7 @@ class CreateProject(StrictModel):
 class StageRequest(StrictModel):
     project_id: str
     part_id: str | None = None
+    part_ids: list[str] | None = Field(None, min_length=1, max_length=100)
 
 
 class GeometryRequest(StageRequest):
@@ -39,7 +40,6 @@ class SegmentRequest(StageRequest):
 
 class ExportRequest(StageRequest):
     formats: list[Literal["svg", "pdf", "eps", "png", "zip"]] = Field(default_factory=lambda: ["svg"], min_length=1, max_length=5)
-    part_ids: list[str] | None = Field(None, min_length=1, max_length=100)
     bundle: Literal["selected_files", "production_pack"] = "selected_files"
 
 
