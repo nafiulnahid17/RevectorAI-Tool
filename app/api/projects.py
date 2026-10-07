@@ -10,7 +10,11 @@ def public_project(project):
     result = project.model_dump(mode="json")
     result['previews'] = {k:v for k,v in result['previews'].items() if k not in {'vector_view','nodes'}}
     result.pop('assistant_sessions',None)
-    result['exports']={k:v for k,v in result['exports'].items() if k.startswith('selected_zip_')}
+    result['exports'] = {
+        k: v
+        for k, v in result['exports'].items()
+        if k.startswith(("selected_zip_", "selected_files_", "production_pack_"))
+    }
     result['true_vector_ready'] = project.true_vector_ready
     result['ai_capabilities'] = {'native_ai_export':False}
     return result
@@ -113,7 +117,11 @@ def artifact(project_id: str, artifact_path: str, request: Request):
         allowed.update(part.exports.values())
         allowed.update(part.previews.values())
     allowed.add(request.app.state.engine.key(p, "reports/validation.json"))
-    if key not in allowed or not request.app.state.engine.storage.exists(key):
+    export_artifact = (
+        artifact_path.startswith("exports/")
+        and request.app.state.engine.storage.exists(key)
+    )
+    if (key not in allowed and not export_artifact) or not request.app.state.engine.storage.exists(key):
         raise HTTPException(404, "Artifact does not exist in the current project manifest")
     return FileResponse(request.app.state.engine.storage.path(key), filename=artifact_path.rsplit("/", 1)[-1],
                         headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox"})
