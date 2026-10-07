@@ -43,7 +43,9 @@ def test_both_unavailable_returns_structured_failure():
         AIRouter(primary=FailedProvider(), fallback=FailedProvider()).invoke(
             "analyze_artwork", Image.new("RGB", (64, 64))
         )
-    assert len(result.value.diagnostics["attempts"]) == 2
+    # Structured primary operations retry once before falling back.
+    assert len(result.value.diagnostics["attempts"]) == 3
+    assert result.value.diagnostics["attempts"][0]["retry_scheduled"] is True
     assert result.value.code == "AI_PROVIDER_UNAVAILABLE"
 
 
