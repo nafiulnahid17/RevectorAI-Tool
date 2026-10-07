@@ -22,6 +22,16 @@ PREPARE_VERSION = "prepare/3.0-dynamic-selective"
 BODY_WIDTH_MM = 558.8
 BODY_HEIGHT_MM = 787.4
 
+def _requires_confirmation(part) -> bool:
+    """Only inferred/manual geometry requires an explicit human confirmation.
+
+    Engine-refined detected components are already eligible for selective
+    vectorization. AI-reconstructed or manually drawn/edited parts must still
+    be confirmed before production.
+    """
+    return part.source != "engine_refined"
+
+
 
 def _normalize_generated_size(
     image: Image.Image, target: tuple[int, int]
@@ -331,10 +341,10 @@ class ProductionWorkflow:
 
             for part_id in selected:
                 part = by_id[part_id]
-                if not part.confirmed:
+                if _requires_confirmation(part) and not part.confirmed:
                     raise EngineError(
                         "PART_REVIEW_REQUIRED",
-                        "Every selected component must be reviewed and confirmed",
+                        "Selected reconstructed/manual components must be confirmed before production",
                         status=409,
                         diagnostics={"part_ids": [part_id]},
                     )
@@ -390,11 +400,15 @@ class ProductionWorkflow:
                 "Select at least one production component",
                 status=409,
             )
-        unconfirmed = [part.part_id for part in parts if not part.confirmed]
+        unconfirmed = [
+            part.part_id
+            for part in parts
+            if _requires_confirmation(part) and not part.confirmed
+        ]
         if unconfirmed:
             raise EngineError(
                 "PART_REVIEW_REQUIRED",
-                "Selected components must be confirmed before vectorization",
+                "Selected reconstructed/manual components must be confirmed before vectorization",
                 status=409,
                 diagnostics={"part_ids": unconfirmed},
             )
