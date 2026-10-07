@@ -231,6 +231,51 @@ def _physical_inches(value: str) -> float | None:
     return number * factors[unit]
 
 
+def _svg_physical_points(data: bytes) -> tuple[float, float] | None:
+    root = SafeET.fromstring(data)
+    width_in = _physical_inches(root.get("width", ""))
+    height_in = _physical_inches(root.get("height", ""))
+    if not width_in or not height_in:
+        return None
+    return width_in * 72.0, height_in * 72.0
+
+
+def _validate_eps_page_size(data: bytes, eps_data: bytes, tolerance_pt: float = 1.5) -> dict:
+    expected = _svg_physical_points(data)
+    if expected is None:
+        raise EngineError(
+            "EXPORT_DIMENSIONS_REQUIRED",
+            "EPS production output requires physical SVG width and height units",
+        )
+    profile = _eps_dsc(eps_data)
+    box = profile.get("hires_bounding_box_pt") or profile.get("bounding_box_pt")
+    if not box:
+        raise EngineError(
+            "EXPORT_STANDARD_MISMATCH",
+            "EPS output is missing BoundingBox metadata",
+        )
+    actual = (float(box[2]) - float(box[0]), float(box[3]) - float(box[1]))
+    if (
+        abs(actual[0] - expected[0]) > tolerance_pt
+        or abs(actual[1] - expected[1]) > tolerance_pt
+    ):
+        raise EngineError(
+            "EXPORT_DIMENSION_MISMATCH",
+            "EPS BoundingBox does not match the confirmed physical part size",
+            diagnostics={
+                "expected_points": [round(expected[0], 3), round(expected[1], 3)],
+                "actual_points": [round(actual[0], 3), round(actual[1], 3)],
+                "tolerance_points": tolerance_pt,
+            },
+        )
+    return {
+        **profile,
+        "expected_points": [round(expected[0], 3), round(expected[1], 3)],
+        "actual_points": [round(actual[0], 3), round(actual[1], 3)],
+        "physical_size_match": True,
+    }
+
+
 def rasterize_png(
     data: bytes,
     *,
@@ -349,7 +394,7 @@ def convert(
                 )
             verify_conversion(output, format, timeout, mode)
             if format == "eps":
-                profile = _eps_dsc(exported)
+                profile = _validate_eps_page_size(data, exported)
                 if profile.get("epsf") != "3.0" or profile.get("postscript_level") != 2:
                     raise EngineError(
                         "EXPORT_STANDARD_MISMATCH",
