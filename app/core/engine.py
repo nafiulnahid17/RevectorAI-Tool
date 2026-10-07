@@ -77,8 +77,14 @@ class Engine:
         return project
 
     def load(self, project_id: str) -> Project:
-        p=self.storage.load(project_id)
-        p.exports={k:v for k,v in p.exports.items() if k.startswith('selected_zip_')} if p.stage_metadata.get('export_policy')=='parts_only_v1' else {}
+        p = self.storage.load(project_id)
+        policy = p.stage_metadata.get("export_policy")
+        safe_prefixes = ("selected_zip_", "selected_files_", "production_pack_")
+        p.exports = (
+            {k: v for k, v in p.exports.items() if k.startswith(safe_prefixes)}
+            if policy in {"parts_only_v1", "validated_selected_parts_v2"}
+            else {}
+        )
         return p
 
     def key(self, project: Project, suffix: str) -> str:
@@ -334,11 +340,24 @@ class Engine:
 
     def selected(self, p, params) -> list[Part]:
         self.require(bool(p.parts), "Segment artwork first")
-        if params.get("part_id"):
-            matches = [part for part in p.parts if part.part_id == params["part_id"]]
-            if not matches:
-                raise EngineError("PART_NOT_FOUND", "Part does not exist", status=404)
-            return matches
+        part_id = params.get("part_id")
+        part_ids = params.get("part_ids")
+        if part_id and part_ids:
+            raise EngineError("INVALID_PART_SELECTION", "Use part_id or part_ids, not both", status=422)
+        if part_id:
+            part_ids = [part_id]
+        if part_ids:
+            ordered_ids = list(dict.fromkeys(part_ids))
+            by_id = {part.part_id: part for part in p.parts}
+            missing = [item for item in ordered_ids if item not in by_id]
+            if missing:
+                raise EngineError(
+                    "PART_NOT_FOUND",
+                    "Part selection contains an unknown component",
+                    status=404,
+                    diagnostics={"part_ids": missing},
+                )
+            return [by_id[item] for item in ordered_ids]
         return p.parts
 
     def stage_reconstruct(self, p, params, cancelled):
@@ -511,62 +530,139 @@ class Engine:
         return {"parts": results, "cached": all(r.get("cached") for r in results.values())}
 
     def stage_compose(self, p, params, cancelled):
-        self.require(bool(p.parts) and all(part.vector and part.cache.get("optimize") for part in p.parts),
-                     "Optimize every current part before composing")
-        signature = digest([[part.model_dump(exclude={"cache", "warnings", "metrics", "validation", "previews", "processing_state", "error"}), self.file_hash(part.vector)]
-                            for part in p.parts] + [p.settings.known_width_mm, p.settings.bleed_mm, p.settings.safe_zone_mm])
+        selected = self.selected(p, params)
+        selected_ids = [part.part_id for part in selected]
+        self.require(
+            bool(selected)
+            and all(part.vector and part.cache.get("optimize") for part in selected),
+            "Optimize every selected part before composing",
+        )
+        signature = digest(
+            [
+                [
+                    part.model_dump(
+                        exclude={
+                            "cache",
+                            "warnings",
+                            "metrics",
+                            "validation",
+                            "previews",
+                            "processing_state",
+                            "error",
+                        }
+                    ),
+                    self.file_hash(part.vector),
+                ]
+                for part in selected
+            ]
+            + [
+                selected_ids,
+                p.settings.known_width_mm,
+                p.settings.bleed_mm,
+                p.settings.safe_zone_mm,
+            ]
+        )
         if self._cached(p, "compose", signature):
-            return {"cached": True}
+            return {"cached": True, "selected_part_ids": selected_ids}
+
         self.invalidate(p, "compose")
-        vectors = [(part, SafeET.fromstring(self.storage.get(part.vector)),
-                    np.asarray(self.image(part.mask).getchannel("R"))) for part in p.parts]
+        vectors = [
+            (
+                part,
+                SafeET.fromstring(self.storage.get(part.vector)),
+                np.asarray(self.image(part.mask).getchannel("R")),
+            )
+            for part in selected
+        ]
         data = compose(p, vectors, tuple(p.geometry["output_dimensions"]))
         p.master_svg = self.key(p, "vectors/master.svg")
         self.storage.put(p.master_svg, data)
         part_outputs = []
         for part, root, mask in vectors:
             key = self.key(p, f"vectors/{part.part_id}.svg")
-            self.storage.put(key, compose(p, [(part, root, mask)], part.bbox[2:], single_part=True))
+            self.storage.put(
+                key,
+                compose(
+                    p,
+                    [(part, root, mask)],
+                    part.bbox[2:],
+                    single_part=True,
+                ),
+            )
             part_outputs.append(key)
         self.record_cache(p, "compose", signature, [p.master_svg, *part_outputs])
-        return {"master_svg": p.master_svg, "part_files": part_outputs, "dimensions": "calibrated" if p.settings.known_width_mm else "uncalibrated"}
+        return {
+            "master_svg": p.master_svg,
+            "part_files": part_outputs,
+            "selected_part_ids": selected_ids,
+            "dimensions": (
+                "calibrated" if p.settings.known_width_mm else "part-calibrated"
+            ),
+        }
 
     def stage_validate(self, p, params, cancelled):
-        self.require(bool(p.master_svg), "Compose the master SVG first")
+        selected = self.selected(p, params)
+        selected_ids = [part.part_id for part in selected]
+        self.require(bool(p.master_svg), "Compose the selected SVG set first")
+        composed_ids = (
+            p.stage_metadata.get("compose", {}).get("selected_part_ids") or selected_ids
+        )
+        if set(composed_ids) != set(selected_ids):
+            raise EngineError(
+                "STALE_VALIDATION",
+                "The selected part set changed after composition; compose again",
+                status=409,
+            )
+
         data = self.storage.get(p.master_svg)
-        report = validate_svg(data, max_bytes=self.settings.max_svg_bytes, max_pixels=self.settings.max_pixels)
+        report = validate_svg(
+            data,
+            max_bytes=self.settings.max_svg_bytes,
+            max_pixels=self.settings.max_pixels,
+        )
         p.validation = report
+        report["selected_part_ids"] = selected_ids
         report["validated_sha256"] = hashlib.sha256(data).hexdigest()
+        report["resolution_independent"] = True
+        report["embedded_raster_policy"] = "forbidden" if p.settings.export_mode == "true_vector" else "hybrid"
         if not report["valid_svg"]:
             raise EngineError("SVG_VALIDATION_FAILED", "; ".join(report["errors"][:5]))
         if report["embedded_rasters"] and p.settings.export_mode == "true_vector":
             raise EngineError("RASTER_FOUND_IN_TRUE_VECTOR", "Raster detected in True Vector project")
         if not report["meaningful_shape_count"] or report["illustrator_compatibility"] == "FAIL":
             raise EngineError("SVG_VALIDATION_FAILED", "No meaningful vector artwork or incompatible SVG")
+
         size = tuple(p.geometry["output_dimensions"])
         vector = render_svg(data, *size)
         reference = Image.new("RGBA", size)
-        for part in p.parts:
+        for part in selected:
             reference.alpha_composite(self.image(part.clean_reference), part.bbox[:2])
         metrics, difference = compare(reference, vector)
         report["render_succeeded"] = True
         report["visual_comparison"] = metrics
-        # No pixel-fidelity promise: difficult input and aggressive cleanup need review.
         if metrics["ssim"] is not None and metrics["ssim"] < .85:
-            report["warnings"].append("Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production.")
+            report["warnings"].append(
+                "Visual similarity below 0.85 SSIM; review the clean reference, vector and difference previews before production."
+            )
             report["illustrator_compatibility"] = "PASS_WITH_WARNINGS"
+
         report["parts"] = []
-        for part in p.parts:
+        for part in selected:
             part_data = self.storage.get(self.key(p, f"vectors/{part.part_id}.svg"))
             part_report = validate_svg(part_data)
             if not part_report["true_vector"]:
-                raise EngineError("SVG_VALIDATION_FAILED", "A composed part did not pass True Vector validation")
+                raise EngineError(
+                    "SVG_VALIDATION_FAILED",
+                    "A selected composed part did not pass True Vector validation",
+                    diagnostics={"part_id": part.part_id},
+                )
             part_render = render_svg(part_data, part.bbox[2], part.bbox[3])
             part_diff, _ = compare(self.image(part.clean_reference), part_render)
             trace_backend = part.metrics.get("backend")
             production_quality = (
                 "PASS"
-                if trace_backend == "vtracer" and not part.metrics.get("explicit_fallback_trace")
+                if trace_backend == "vtracer"
+                and not part.metrics.get("explicit_fallback_trace")
                 else "REVIEW_REQUIRED"
             )
             part.validation = {
@@ -577,26 +673,42 @@ class Engine:
                 "production_quality": production_quality,
                 "pathfinder_hierarchy": part.metrics.get("trace_metadata", {}).get("hierarchy"),
                 "ocr_objects": len(part.ocr_results),
+                "resolution_independent": True,
+                "physical_width_mm": part.physical_width_mm,
+                "physical_height_mm": part.physical_height_mm,
             }
             if production_quality != "PASS":
                 part.validation["warnings"] = list(part.validation.get("warnings", [])) + [
                     "Production used an explicit/fallback contour trace; review paths before manufacturing."
                 ]
             diagnostic_data, diagnostic_nodes = diagnostic(part_data)
-            diagnostic_key = self.key(p,f'previews/{part.part_id}-paths.svg')
-            self.storage.put(diagnostic_key,diagnostic_data)
-            part.previews['vector_view']=diagnostic_key
+            diagnostic_key = self.key(p, f"previews/{part.part_id}-paths.svg")
+            self.storage.put(diagnostic_key, diagnostic_data)
+            part.previews["vector_view"] = diagnostic_key
             part.metrics["visual_difference"] = part_diff
-            report["parts"].append({"part_id": part.part_id, "part": part.type, "paths": part_report["path_count"],
-                                    "anchors": part_report["total_anchor_count"], "rasters": part_report["embedded_rasters"], "status": "PASS",
-                                    "validated_sha256": hashlib.sha256(part_data).hexdigest(),
-                                    "physical_width_mm": part.physical_width_mm, "physical_height_mm": part.physical_height_mm,
-                                    "trace_backend": part.validation.get("trace_backend"),
-                                    "production_quality": part.validation.get("production_quality"),
-                                    "ocr_objects": part.validation.get("ocr_objects", 0)})
-        p.previews = {"reference": self.put_image(self.key(p, "previews/reference.png"), reference),
-                      "vector_render": self.put_image(self.key(p, "previews/vector_render.png"), vector),
-                      "difference": self.put_image(self.key(p, "previews/difference.png"), difference)}
+            report["parts"].append(
+                {
+                    "part_id": part.part_id,
+                    "part": part.type,
+                    "paths": part_report["path_count"],
+                    "anchors": part_report["total_anchor_count"],
+                    "rasters": part_report["embedded_rasters"],
+                    "status": "PASS",
+                    "validated_sha256": hashlib.sha256(part_data).hexdigest(),
+                    "physical_width_mm": part.physical_width_mm,
+                    "physical_height_mm": part.physical_height_mm,
+                    "trace_backend": part.validation.get("trace_backend"),
+                    "production_quality": part.validation.get("production_quality"),
+                    "ocr_objects": part.validation.get("ocr_objects", 0),
+                    "resolution_independent": True,
+                }
+            )
+
+        p.previews = {
+            "reference": self.put_image(self.key(p, "previews/reference.png"), reference),
+            "vector_render": self.put_image(self.key(p, "previews/vector_render.png"), vector),
+            "difference": self.put_image(self.key(p, "previews/difference.png"), difference),
+        }
         view_data, nodes = diagnostic(data)
         view_key = self.key(p, "previews/vector_view.svg")
         self.storage.put(view_key, view_data)
@@ -604,101 +716,170 @@ class Engine:
         nodes_key = self.key(p, "reports/nodes.json")
         self.storage.json(nodes_key, nodes)
         p.previews["nodes"] = nodes_key
-        report.update(status="PASS",vector_status=report["status"],vector_paths=report["path_count"],editable_objects=report["shape_count"],geometry_integrity="PASS")
+        report.update(
+            status="PASS",
+            vector_status=report["status"],
+            vector_paths=report["path_count"],
+            editable_objects=report["shape_count"],
+            geometry_integrity="PASS",
+        )
         report["file_size_bytes"] = len(data)
         p.state = State.VALIDATED
         self.storage.save(p)
         self.storage.json(self.key(p, "reports/validation.json"), report)
         p.usage["output_paths"] = report["path_count"]
         p.usage["output_anchors"] = report["total_anchor_count"]
-        return {"validation": report}
+        return {"validation": report, "selected_part_ids": selected_ids}
 
     def stage_export(self, p, params, cancelled):
-        self.require(p.state == State.READY and bool(p.validation and p.validation.get("render_succeeded")),
-                     "Validate and render the current master before export")
+        self.require(
+            p.state == State.READY
+            and bool(p.validation and p.validation.get("render_succeeded")),
+            "Validate the selected production parts before export",
+        )
         formats = params.get("formats", ["svg"])
         if not formats or any(f not in {"svg", "pdf", "eps", "png", "zip"} for f in formats):
-            raise EngineError("UNSUPPORTED_EXPORT", "Supported formats: svg, pdf, eps, png, zip; native AI is not supported")
-        data = self.storage.get(p.master_svg)
-        if hashlib.sha256(data).hexdigest() != p.validation.get("validated_sha256"):
-            raise EngineError("STALE_VALIDATION", "Master changed after validation; validate it again", status=409)
-        exporter.approve(data, p.settings.export_mode)
-        for part in p.parts:
-            key = self.key(p, f"vectors/{part.part_id}.svg")
-            record = next((entry for entry in p.validation.get("parts", []) if entry["part_id"] == part.part_id), {})
-            if not self.storage.exists(key) or self.file_hash(key) != record.get("validated_sha256"):
-                raise EngineError("STALE_VALIDATION", "Part changed after validation; validate again", status=409)
-        failures = {}
+            raise EngineError(
+                "UNSUPPORTED_EXPORT",
+                "Supported formats: svg, pdf, eps, png, zip; native AI is not supported",
+            )
+
         selected_ids = params.get("part_ids")
         if params.get("part_id"):
             if selected_ids:
                 raise EngineError("INVALID_EXPORT_SELECTION", "Use part_id or part_ids, not both")
             selected_ids = [params["part_id"]]
-        selected_ids = selected_ids or [part.part_id for part in p.parts]
-        chosen = [part for part in p.parts if part.part_id in selected_ids]
-        if selected_ids and (not chosen or len(set(selected_ids)) != len(chosen)):
-            raise EngineError("PART_NOT_FOUND", "Export selection contains an unknown part", status=404)
-        if chosen:
-            p.stage_metadata["export_policy"]="parts_only_v1"
-            part_files = {}
-            for part in chosen:
-                part_data = self.storage.get(self.key(p, f"vectors/{part.part_id}.svg"))
-                validation = next((v for v in p.validation.get("parts", []) if v["part_id"] == part.part_id), {})
-                if hashlib.sha256(part_data).hexdigest() != validation.get("validated_sha256"):
-                    raise EngineError("STALE_VALIDATION", "Part changed after validation; validate again", status=409)
-                exporter.approve(part_data, p.settings.export_mode)
-                for format in [f for f in formats if f != "zip"]:
-                    if cancelled():
-                        raise EngineError("JOB_CANCELLED", "Part export cancelled")
-                    key = self.key(p, f"exports/{part.part_id}.{format}")
-                    try:
-                        output = (
-                            part_data
-                            if format == "svg"
-                            else exporter.rasterize_png(
-                                part_data,
-                                dpi=300,
-                                timeout=self.settings.tool_timeout_seconds,
-                                mode=p.settings.export_mode,
-                                max_pixels=self.settings.max_export_pixels,
-                            )
-                            if format == "png"
-                            else exporter.convert(
-                                part_data,
-                                format,
-                                self.settings.tool_timeout_seconds,
-                                p.settings.export_mode,
-                            )
+        validated_ids = list(p.validation.get("selected_part_ids") or [])
+        selected_ids = selected_ids or validated_ids
+        if not selected_ids:
+            raise EngineError("INVALID_EXPORT_SELECTION", "No validated production parts are available")
+
+        by_id = {part.part_id: part for part in p.parts}
+        unknown = [item for item in selected_ids if item not in by_id]
+        if unknown:
+            raise EngineError(
+                "PART_NOT_FOUND",
+                "Export selection contains an unknown part",
+                status=404,
+                diagnostics={"part_ids": unknown},
+            )
+        not_validated = [item for item in selected_ids if item not in set(validated_ids)]
+        if not_validated:
+            raise EngineError(
+                "VALIDATION_REQUIRED",
+                "Every exported part must belong to the current validated selection",
+                status=409,
+                diagnostics={"part_ids": not_validated},
+            )
+
+        data = self.storage.get(p.master_svg)
+        if hashlib.sha256(data).hexdigest() != p.validation.get("validated_sha256"):
+            raise EngineError(
+                "STALE_VALIDATION",
+                "Master changed after validation; validate it again",
+                status=409,
+            )
+        exporter.approve(data, p.settings.export_mode)
+
+        chosen = [by_id[item] for item in selected_ids]
+        for part in chosen:
+            key = self.key(p, f"vectors/{part.part_id}.svg")
+            record = next(
+                (entry for entry in p.validation.get("parts", []) if entry["part_id"] == part.part_id),
+                {},
+            )
+            if not self.storage.exists(key) or self.file_hash(key) != record.get("validated_sha256"):
+                raise EngineError(
+                    "STALE_VALIDATION",
+                    "Selected part changed after validation; validate again",
+                    status=409,
+                    diagnostics={"part_id": part.part_id},
+                )
+
+        p.stage_metadata["export_policy"] = "validated_selected_parts_v2"
+        failures = {}
+        part_files = {}
+        for part in chosen:
+            part_data = self.storage.get(self.key(p, f"vectors/{part.part_id}.svg"))
+            validation = next(
+                (v for v in p.validation.get("parts", []) if v["part_id"] == part.part_id),
+                {},
+            )
+            if hashlib.sha256(part_data).hexdigest() != validation.get("validated_sha256"):
+                raise EngineError(
+                    "STALE_VALIDATION",
+                    "Part changed after validation; validate again",
+                    status=409,
+                )
+            exporter.approve(part_data, p.settings.export_mode)
+            for format in [f for f in formats if f != "zip"]:
+                if cancelled():
+                    raise EngineError("JOB_CANCELLED", "Part export cancelled")
+                key = self.key(p, f"exports/{part.part_id}.{format}")
+                try:
+                    output = (
+                        part_data
+                        if format == "svg"
+                        else exporter.rasterize_png(
+                            part_data,
+                            dpi=300,
+                            timeout=self.settings.tool_timeout_seconds,
+                            mode=p.settings.export_mode,
+                            max_pixels=self.settings.max_export_pixels,
                         )
-                        self.storage.put(key, output)
-                        part.exports[format] = key
-                        p.usage["export_operations"] += 1
-                    except EngineError as exc:
-                        failures[f"{part.part_id}:{format}"] = exc.as_dict()
-                part_files[part.part_id] = dict(part.exports)
-            exports = {}
-            if "zip" in formats:
-                token = digest([sorted(set(selected_ids)), sorted(formats), params.get("bundle", "selected_files")])[:16]
-                bundle = params.get("bundle", "selected_files")
-                if bundle == "production_pack":
-                    key = self.key(p, f"exports/production-pack-{token}.zip")
-                    payload = self.pack(p, selected_ids=set(selected_ids))
-                    p.exports[f"production_pack_{token}"] = key
-                else:
-                    key = self.key(p, f"exports/selected-files-{token}.zip")
-                    payload = self.pack_selected_files(p, set(selected_ids), set(formats))
-                    p.exports[f"selected_files_{token}"] = key
-                self.storage.put(key, payload)
-                exports["zip"] = key
-                p.usage["export_operations"] += 1
-            return {
-                "exports": exports,
-                "part_files": part_files,
-                "export_errors": failures,
-                "success": not failures,
-                "bundle": params.get("bundle", "selected_files"),
-            }
-        raise EngineError('INVALID_EXPORT_SELECTION','No real production parts selected')
+                        if format == "png"
+                        else exporter.convert(
+                            part_data,
+                            format,
+                            self.settings.tool_timeout_seconds,
+                            p.settings.export_mode,
+                        )
+                    )
+                    self.storage.put(key, output)
+                    part.exports[format] = key
+                    p.usage["export_operations"] += 1
+                except EngineError as exc:
+                    failures[f"{part.part_id}:{format}"] = exc.as_dict()
+            part_files[part.part_id] = dict(part.exports)
+
+        exports = {}
+        if "zip" in formats:
+            token = digest(
+                [
+                    sorted(set(selected_ids)),
+                    sorted(formats),
+                    params.get("bundle", "selected_files"),
+                    p.validation.get("validated_sha256"),
+                ]
+            )[:16]
+            bundle = params.get("bundle", "selected_files")
+            if bundle == "production_pack":
+                key = self.key(p, f"exports/production-pack-{token}.zip")
+                payload = self.pack(p, selected_ids=set(selected_ids))
+                p.exports[f"production_pack_{token}"] = key
+            else:
+                key = self.key(p, f"exports/selected-files-{token}.zip")
+                payload = self.pack_selected_files(p, set(selected_ids), set(formats))
+                p.exports[f"selected_files_{token}"] = key
+            self.storage.put(key, payload)
+            exports["zip"] = key
+            p.usage["export_operations"] += 1
+
+        return {
+            "exports": exports,
+            "part_files": part_files,
+            "export_errors": failures,
+            "success": not failures,
+            "bundle": params.get("bundle", "selected_files"),
+            "selected_part_ids": selected_ids,
+            "production_profile": {
+                "resolution_independent_vector": True,
+                "png_dpi": 300,
+                "eps": "EPSF 3.0 / PostScript Level 2 / CMYK",
+                "pdf": "CMYK vector-preserving",
+                "native_ai": False,
+            },
+        }
 
     def pack_selected_files(self, p: Project, selected_ids: set[str], formats: set[str]) -> bytes:
         """Create the lightweight Download Selected Parts archive.

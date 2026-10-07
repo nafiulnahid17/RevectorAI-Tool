@@ -179,11 +179,11 @@ def test_dispatched_failed_fallback_still_consumes_quota(tmp_path):
     assert quota.status()["used"] == 1
 
 
-def test_master_mockup_command_is_versioned_and_canonical():
-    assert MOCKUP_VERSION == "jersey-production-layout/1.0"
-    assert "Exactly eight detached" in MASTER_MOCKUP_COMMAND
-    assert "NO DOUBLE COLLARS" in MASTER_MOCKUP_COMMAND
-    assert "Output only the raster reference layout." in MASTER_MOCKUP_COMMAND
+def test_master_mockup_command_is_dynamic_and_versioned():
+    assert MOCKUP_VERSION == "jersey-dynamic-production-layout/2.0"
+    assert "Do NOT force an eight-part template" in MASTER_MOCKUP_COMMAND
+    assert "If 2, 8, 12, 16 or more real components are present" in MASTER_MOCKUP_COMMAND
+    assert "Do not invent missing" in MASTER_MOCKUP_COMMAND
 
 
 def test_workspace_presets_control_ai_raster_targets():

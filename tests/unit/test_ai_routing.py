@@ -43,7 +43,8 @@ def test_both_unavailable_returns_structured_failure():
         AIRouter(primary=FailedProvider(), fallback=FailedProvider()).invoke(
             "analyze_artwork", Image.new("RGB", (64, 64))
         )
-    assert len(result.value.diagnostics["attempts"]) == 2
+    # analyze_artwork retries the primary once before the fallback attempt.
+    assert len(result.value.diagnostics["attempts"]) == 3
     assert result.value.code == "AI_PROVIDER_UNAVAILABLE"
 
 
@@ -220,3 +221,18 @@ def test_provider_change_changes_cache_fingerprint():
     old = router.fingerprint()
     p.model = "another-model"
     assert old != router.fingerprint()
+
+
+def test_dynamic_candidate_accepts_nonstandard_real_component():
+    from app.ai.contracts import Candidate
+
+    candidate = Candidate.model_validate(
+        {
+            "part_type": "SIDE_PANEL_02",
+            "candidate_bbox": [0.1, 0.2, 0.3, 0.4],
+            "confidence": 0.9,
+            "uncertain": False,
+            "notes": "Visible detached side panel",
+        }
+    )
+    assert candidate.part_type == "SIDE_PANEL_02"

@@ -24,7 +24,15 @@ def test_part_measurements_in_export_and_selective_zip(engine):
     assert not p.true_vector_ready
     engine.run(p.project_id, 'compose')
     engine.run(p.project_id, 'validate')
-    result = engine.run(p.project_id, 'export', {'part_ids': [first.part_id], 'formats': ['svg', 'zip']})
+    result = engine.run(
+        p.project_id,
+        'export',
+        {
+            'part_ids': [first.part_id],
+            'formats': ['svg', 'zip'],
+            'bundle': 'production_pack',
+        },
+    )
     assert not result['export_errors']
     root = ET.fromstring(engine.storage.get(result['part_files'][first.part_id]['svg']))
     assert root.get('width') == '520.000000mm'
@@ -80,11 +88,23 @@ def test_color_edit_invalidates_downloads_and_survives_revalidation(engine):
 @pytest.mark.skipif(not all(shutil.which(tool) for tool in ('inkscape','pdfinfo','pdfimages','gs')), reason='Inkscape + Poppler + Ghostscript required')
 def test_individual_vector_pdf_eps_and_pack(engine):
     p = complete(engine)
-    result = engine.run(p.project_id, 'export', {'part_id': p.parts[0].part_id, 'formats': ['pdf', 'eps', 'zip']})
+    result = engine.run(
+        p.project_id,
+        'export',
+        {
+            'part_id': p.parts[0].part_id,
+            'formats': ['pdf', 'eps', 'zip'],
+            'bundle': 'production_pack',
+        },
+    )
     assert not result['export_errors']
     files = result['part_files'][p.parts[0].part_id]
     assert engine.storage.get(files['pdf']).startswith(b'%PDF')
-    assert engine.storage.get(files['eps']).startswith(b'%!PS')
+    eps = engine.storage.get(files['eps'])
+    assert eps.startswith(b'%!PS')
+    assert b'EPSF-3.0' in eps[:4096]
+    assert b'%%LanguageLevel: 2' in eps[:20000]
+    assert b'DeviceCMYK' in eps or b'setcmykcolor' in eps
     with zipfile.ZipFile(BytesIO(engine.storage.get(result['exports']['zip']))) as archive:
         assert any(name.endswith('.eps') for name in archive.namelist())
         assert any(name.endswith('.pdf') for name in archive.namelist())
@@ -125,6 +145,9 @@ def test_selected_files_zip_is_distinct_from_production_pack(engine):
         {'part_ids': ids, 'formats': ['svg', 'zip'], 'bundle': 'production_pack'},
     )
     assert selected['exports']['zip'] != pack['exports']['zip']
+    persisted = engine.load(p.project_id).exports
+    assert any(key.startswith('selected_files_') for key in persisted)
+    assert any(key.startswith('production_pack_') for key in persisted)
     with zipfile.ZipFile(BytesIO(engine.storage.get(pack['exports']['zip']))) as archive:
         names = archive.namelist()
         assert any(name.startswith('parts/') for name in names)

@@ -63,7 +63,14 @@ def test_api_staged_workflow(tmp_path, simple_bytes):
             assert client.get("/api/revector/jobs/" + job["job_id"]).json()["status"] == "completed"
         status = client.get(f"/api/revector/projects/{pid}/status").json()
         assert status["true_vector_ready"]
-        result = client.post("/api/revector/export", json={"project_id": pid, "formats": ["svg", "png", "zip"]}).json()
+        result = client.post(
+            "/api/revector/export",
+            json={
+                "project_id": pid,
+                "formats": ["svg", "zip"],
+                "bundle": "production_pack",
+            },
+        ).json()
         assert result["status"] == "completed"
         key=result["result"]["exports"]["zip"]
         artifact = client.get(f"/api/revector/projects/{pid}/artifacts/"+key.split(pid+"/")[1])
@@ -169,6 +176,11 @@ def test_real_pdf_eps_conversion(engine):
     assert not result["export_errors"]
     assert all(engine.storage.get(files["pdf"]).startswith(b"%PDF") for files in result["part_files"].values())
     assert all(engine.storage.get(files["eps"]).startswith(b"%!PS") for files in result["part_files"].values())
+    for files in result["part_files"].values():
+        eps = engine.storage.get(files["eps"])
+        assert b"EPSF-3.0" in eps[:4096]
+        assert b"%%LanguageLevel: 2" in eps[:20000]
+        assert b"DeviceCMYK" in eps or b"setcmykcolor" in eps
 
 
 def test_traversal_denied(engine):
