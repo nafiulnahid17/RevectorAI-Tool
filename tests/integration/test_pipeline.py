@@ -63,7 +63,14 @@ def test_api_staged_workflow(tmp_path, simple_bytes):
             assert client.get("/api/revector/jobs/" + job["job_id"]).json()["status"] == "completed"
         status = client.get(f"/api/revector/projects/{pid}/status").json()
         assert status["true_vector_ready"]
-        result = client.post("/api/revector/export", json={"project_id": pid, "formats": ["svg", "png", "zip"]}).json()
+        result = client.post(
+            "/api/revector/export",
+            json={
+                "project_id": pid,
+                "formats": ["svg", "zip"],
+                "bundle": "production_pack",
+            },
+        ).json()
         assert result["status"] == "completed"
         key=result["result"]["exports"]["zip"]
         artifact = client.get(f"/api/revector/projects/{pid}/artifacts/"+key.split(pid+"/")[1])
