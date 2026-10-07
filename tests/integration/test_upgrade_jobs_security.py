@@ -24,7 +24,7 @@ def test_all_upgrade_routes_are_owner_checked(tmp_path):
             ("/recover-part", {"part_id": "part_test"}),
             ("/ai-missing", {"slot": "LEFT_SLEEVE"}),
             ("/slots/update", {"slot": "LEFT_SLEEVE", "status": "blank"}),
-            ("/review/confirm", {"decisions": {}}),
+            ("/review/confirm", {"part_ids": ["part_test"], "decisions": {}}),
             ("/assistant/explain", {"question": "Why?"}),
             (
                 "/assistant/feedback",
