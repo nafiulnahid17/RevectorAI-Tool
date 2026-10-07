@@ -31,9 +31,12 @@ def test_part_measurements_in_export_and_selective_zip(engine):
     assert root.get('height') == '720.000000mm'
     assert any(e.get('id', '').endswith('BLEED_PATH') for e in root.iter())
     with zipfile.ZipFile(BytesIO(engine.storage.get(result['exports']['zip']))) as archive:
-        assert 'master.svg' not in archive.namelist()
-        assert sum(name.startswith('parts/') for name in archive.namelist()) == 1
-        assert not any(second.part_id in name for name in archive.namelist())
+        names = archive.namelist()
+        assert 'master.svg' not in names
+        assert len(names) == 1
+        assert names[0].endswith('.svg')
+        assert first.part_id in names[0]
+        assert not any(second.part_id in name for name in names)
     assert p.project_id in result['part_files'][first.part_id]['svg']
 
 
