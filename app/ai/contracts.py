@@ -26,10 +26,47 @@ SlotType = Literal[
     "BOTTOM_TRIM",
 ]
 
+# Standard jersey slots remain useful labels, but detection is intentionally not
+# limited to eight components. Extra production pieces are preserved as real
+# selectable parts instead of being discarded or forced into a slot.
+COMPONENTS = (
+    *SLOTS,
+    "LEFT_SHOULDER",
+    "RIGHT_SHOULDER",
+    "LEFT_CUFF",
+    "RIGHT_CUFF",
+    "LEFT_SIDE_PANEL",
+    "RIGHT_SIDE_PANEL",
+    "POCKET",
+    "TRIM",
+    "OTHER_PART",
+    "UNKNOWN",
+)
+ComponentType = Literal[
+    "LEFT_SLEEVE",
+    "RIGHT_SLEEVE",
+    "FRONT_BODY",
+    "BACK_BODY",
+    "FRONT_COLLAR",
+    "BACK_COLLAR",
+    "TOP_TRIM",
+    "BOTTOM_TRIM",
+    "LEFT_SHOULDER",
+    "RIGHT_SHOULDER",
+    "LEFT_CUFF",
+    "RIGHT_CUFF",
+    "LEFT_SIDE_PANEL",
+    "RIGHT_SIDE_PANEL",
+    "POCKET",
+    "TRIM",
+    "OTHER_PART",
+    "UNKNOWN",
+]
+
 
 class Candidate(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
-    part_type: SlotType
+    part_type: ComponentType
     candidate_bbox: tuple[float, float, float, float] = Field(
         description="Normalized x,y,width,height in [0,1]"
     )
@@ -57,10 +94,10 @@ class TextRegionEvidence(BaseModel):
 class ArtworkAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     artwork_type: str = "unknown"
-    expected_parts: list[SlotType] = Field(default_factory=lambda: list(SLOTS))
-    visible_parts: list[SlotType] = Field(default_factory=list)
-    missing_parts: list[SlotType] = Field(default_factory=list)
-    uncertain_parts: list[SlotType] = Field(default_factory=list)
+    expected_parts: list[ComponentType] = Field(default_factory=lambda: list(SLOTS))
+    visible_parts: list[ComponentType] = Field(default_factory=list)
+    missing_parts: list[ComponentType] = Field(default_factory=list)
+    uncertain_parts: list[ComponentType] = Field(default_factory=list)
     dominant_colors: list[str] = Field(default_factory=list, max_length=64)
     logos: list[LogoEvidence] = Field(default_factory=list, max_length=100)
     text_regions: list[TextRegionEvidence] = Field(default_factory=list, max_length=100)
@@ -79,8 +116,8 @@ class MockupQC(BaseModel):
     pass_qc: bool = False
     serious_failure: bool = False
     component_count: int = Field(0, ge=0, le=32)
-    missing_parts: list[SlotType] = Field(default_factory=list)
-    duplicate_parts: list[SlotType] = Field(default_factory=list)
+    missing_parts: list[ComponentType] = Field(default_factory=list)
+    duplicate_parts: list[ComponentType] = Field(default_factory=list)
     extra_components: list[str] = Field(default_factory=list, max_length=32)
     attached_collar: bool = False
     attached_sleeve: bool = False

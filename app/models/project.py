@@ -37,7 +37,8 @@ class State(StrEnum):
 
 PartType = Literal["front_body", "back_body", "left_sleeve", "right_sleeve", "left_shoulder",
                    "right_shoulder", "front_collar", "back_collar", "left_cuff", "right_cuff",
-                   "trim", "top_trim", "bottom_trim", "other_part", "unknown"]
+                   "left_side_panel", "right_side_panel", "pocket", "trim", "top_trim",
+                   "bottom_trim", "other_part", "unknown"]
 
 
 class ProcessingSettings(BaseModel):

@@ -171,40 +171,202 @@ def rasterize_png(
         return exported
 
 
+def _run_ghostscript_cmyk(
+    source_pdf: Path,
+    output: Path,
+    format: str,
+    timeout: int,
+) -> None:
+    """Produce deterministic CMYK handoff output without rasterizing vector artwork."""
+    ghostscript = shutil.which("gs")
+    if not ghostscript:
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            "Ghostscript is required for CMYK production PDF/EPS export",
+        )
+
+    if format == "eps":
+        device_args = [
+            "-sDEVICE=eps2write",
+            "-dLanguageLevel=2",
+            "-dEPSCrop",
+        ]
+    elif format == "pdf":
+        device_args = [
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.6",
+        ]
+    else:
+        raise EngineError("UNSUPPORTED_EXPORT", "CMYK conversion supports PDF/EPS only")
+
+    args = [
+        ghostscript,
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        *device_args,
+        "-sProcessColorModel=DeviceCMYK",
+        "-sColorConversionStrategy=CMYK",
+        "-dOverrideICC",
+        f"-sOutputFile={output}",
+        str(source_pdf),
+    ]
+    result = subprocess.run(
+        args,
+        check=False,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if result.returncode or not output.exists():
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            f"Ghostscript CMYK {format.upper()} conversion failed; SVG is preserved",
+        )
+
+
+def _svg_page_points(data: bytes) -> tuple[float, float] | None:
+    root = SafeET.fromstring(data)
+    width_in = _physical_inches(root.get("width", ""))
+    height_in = _physical_inches(root.get("height", ""))
+    if not width_in or not height_in:
+        return None
+    return width_in * 72.0, height_in * 72.0
+
+
+def _verify_eps_level2_profile(
+    path: Path,
+    expected_points: tuple[float, float] | None = None,
+) -> None:
+    header = path.read_bytes()[:131072].decode("latin-1", errors="replace")
+    first_line = header.splitlines()[0] if header else ""
+    if "EPSF-3.0" not in first_line:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is not EPSF 3.0",
+        )
+    if not re.search(r"^%%LanguageLevel:\s*2\s*$", header, re.MULTILINE):
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is not PostScript LanguageLevel 2",
+        )
+    match = re.search(
+        r"^%%BoundingBox:\s*(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s*$",
+        header,
+        re.MULTILINE,
+    )
+    if not match:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is missing a numeric production BoundingBox",
+        )
+    if expected_points:
+        llx, lly, urx, ury = map(float, match.groups())
+        actual = (urx - llx, ury - lly)
+        if any(abs(a - e) > 2.0 for a, e in zip(actual, expected_points)):
+            raise EngineError(
+                "EXPORT_DIMENSION_MISMATCH",
+                "EPS BoundingBox does not match the SVG physical production size",
+                diagnostics={
+                    "expected_points": [round(v, 3) for v in expected_points],
+                    "actual_points": [round(v, 3) for v in actual],
+                },
+            )
+
+
+def _verify_pdf_page_size(
+    path: Path,
+    expected_points: tuple[float, float] | None,
+    timeout: int,
+) -> None:
+    if not expected_points:
+        return
+    pdfinfo = shutil.which("pdfinfo")
+    if not pdfinfo:
+        raise EngineError(
+            "EXPORT_VALIDATION_UNAVAILABLE",
+            "Poppler pdfinfo is required to verify physical PDF dimensions",
+        )
+    result = subprocess.run(
+        [pdfinfo, str(path)],
+        check=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+    text = result.stdout.decode("utf-8", errors="replace")
+    match = re.search(
+        r"^Page size:\s*([0-9.]+)\s+x\s+([0-9.]+)\s+pts",
+        text,
+        re.MULTILINE,
+    )
+    if not match:
+        raise EngineError(
+            "EXPORT_DIMENSION_MISMATCH",
+            "PDF page size could not be verified",
+        )
+    actual = tuple(map(float, match.groups()))
+    if any(abs(a - e) > 1.0 for a, e in zip(actual, expected_points)):
+        raise EngineError(
+            "EXPORT_DIMENSION_MISMATCH",
+            "PDF page size does not match the SVG physical production size",
+            diagnostics={
+                "expected_points": [round(v, 3) for v in expected_points],
+                "actual_points": [round(v, 3) for v in actual],
+            },
+        )
+
+
 def convert(
     data: bytes, format: str, timeout: int = 180, mode: str = "true_vector"
 ) -> bytes:
+    """Export production vector PDF/EPS.
+
+    SVG is first converted to vector PDF with text outlined, then Ghostscript
+    rewrites it using DeviceCMYK. EPS additionally targets EPSF 3.0 and
+    PostScript LanguageLevel 2. Strict parser checks reject rasterization.
+    """
     if format not in {"pdf", "eps"}:
-        raise EngineError("UNSUPPORTED_EXPORT", "Inkscape export supports PDF/EPS only")
+        raise EngineError("UNSUPPORTED_EXPORT", "Production export supports PDF/EPS only")
     approve(data, mode)
-    executable = shutil.which("inkscape")
-    if not executable:
+    expected_points = _svg_page_points(data)
+
+    inkscape = shutil.which("inkscape")
+    if not inkscape:
         raise EngineError(
             "EXPORT_CONVERSION_FAILED",
             "Inkscape CLI is unavailable; validated SVG is preserved",
         )
+
     with TemporaryDirectory(prefix="revector-export-") as temp:
         folder = Path(temp)
-        source, output = folder / "source.svg", folder / f"output.{format}"
+        source = folder / "source.svg"
+        intermediate = folder / "intermediate.pdf"
+        output = folder / f"output.{format}"
         source.write_bytes(data)
+
         env = os.environ.copy()
         env["INKSCAPE_PROFILE_DIR"] = str(folder / "profile")
-        args = [
-            executable,
-            str(source),
-            f"--export-type={format}",
-            f"--export-filename={output}",
-            "--export-text-to-path",
-        ]
         try:
             result = subprocess.run(
-                args, check=False, capture_output=True, timeout=timeout, env=env
+                [
+                    inkscape,
+                    str(source),
+                    "--export-type=pdf",
+                    f"--export-filename={intermediate}",
+                    "--export-text-to-path",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+                env=env,
             )
-            if result.returncode or not output.exists():
+            if result.returncode or not intermediate.exists():
                 raise EngineError(
                     "EXPORT_CONVERSION_FAILED",
-                    f"Inkscape {format.upper()} conversion failed; SVG is preserved",
+                    "Inkscape vector PDF conversion failed; SVG is preserved",
                 )
+
+            _run_ghostscript_cmyk(intermediate, output, format, timeout)
             exported = output.read_bytes()
             signature = b"%PDF" if format == "pdf" else b"%!PS"
             if not exported.startswith(signature) or len(exported) < 100:
@@ -212,10 +374,17 @@ def convert(
                     "EXPORT_CONVERSION_FAILED",
                     "Conversion did not produce a valid output signature",
                 )
+            if format == "eps":
+                _verify_eps_level2_profile(output, expected_points)
+            else:
+                _verify_pdf_page_size(output, expected_points, timeout)
             verify_conversion(output, format, timeout, mode)
             return exported
+        except EngineError:
+            raise
         except (subprocess.SubprocessError, OSError) as exc:
             raise EngineError(
                 "EXPORT_CONVERSION_FAILED",
-                "Inkscape conversion failed or timed out; SVG is preserved",
+                "Production CMYK conversion failed or timed out; SVG is preserved",
             ) from exc
+

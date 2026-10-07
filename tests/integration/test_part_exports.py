@@ -31,9 +31,12 @@ def test_part_measurements_in_export_and_selective_zip(engine):
     assert root.get('height') == '720.000000mm'
     assert any(e.get('id', '').endswith('BLEED_PATH') for e in root.iter())
     with zipfile.ZipFile(BytesIO(engine.storage.get(result['exports']['zip']))) as archive:
-        assert 'master.svg' not in archive.namelist()
-        assert sum(name.startswith('parts/') for name in archive.namelist()) == 1
-        assert not any(second.part_id in name for name in archive.namelist())
+        names = archive.namelist()
+        assert 'master.svg' not in names
+        assert len(names) == 1
+        assert names[0].endswith('.svg') and '/' not in names[0]
+        assert first.part_id in names[0]
+        assert not any(second.part_id in name for name in names)
     assert p.project_id in result['part_files'][first.part_id]['svg']
 
 
@@ -84,7 +87,12 @@ def test_individual_vector_pdf_eps_and_pack(engine):
     assert not result['export_errors']
     files = result['part_files'][p.parts[0].part_id]
     assert engine.storage.get(files['pdf']).startswith(b'%PDF')
-    assert engine.storage.get(files['eps']).startswith(b'%!PS')
+    eps = engine.storage.get(files['eps'])
+    assert eps.startswith(b'%!PS')
+    header = eps[:16384].decode('latin-1', errors='replace')
+    assert 'EPSF-3.0' in header.splitlines()[0]
+    assert '%%LanguageLevel: 2' in header
+    assert '%%BoundingBox:' in header
     with zipfile.ZipFile(BytesIO(engine.storage.get(result['exports']['zip']))) as archive:
         assert any(name.endswith('.eps') for name in archive.namelist())
         assert any(name.endswith('.pdf') for name in archive.namelist())
@@ -131,3 +139,82 @@ def test_selected_files_zip_is_distinct_from_production_pack(engine):
         assert any(name.startswith('metadata/') for name in names)
         assert any(name.startswith('previews/') for name in names)
         assert 'README.txt' in names
+
+
+def test_single_selected_part_does_not_require_all_detected_parts(engine):
+    p = complete(engine)
+    first, second = p.parts[:2]
+
+    # Only one detected component is reviewed/confirmed. The other remains
+    # unconfirmed and must not block the selected production run.
+    engine.manual(
+        p.project_id,
+        'update',
+        first.part_id,
+        {'type': 'front_body', 'confirmed': True},
+    )
+    reviewed = engine.workflow.review(p.project_id, {}, [first.part_id])
+    selected = next(part for part in reviewed.parts if part.part_id == first.part_id)
+    other = next(part for part in reviewed.parts if part.part_id == second.part_id)
+    assert selected.confirmed
+    assert not other.confirmed
+    assert selected.physical_width_mm == pytest.approx(558.8)
+    assert selected.physical_height_mm == pytest.approx(787.4)
+
+    result = engine.workflow.production(
+        p.project_id,
+        {'part_ids': [first.part_id]},
+        lambda: False,
+    )
+    assert result['selected_part_ids'] == [first.part_id]
+    current = engine.load(p.project_id)
+    assert current.true_vector_ready
+    assert current.validation['selected_part_ids'] == [first.part_id]
+    assert [entry['part_id'] for entry in current.validation['parts']] == [first.part_id]
+    assert current.validation['resolution_independent'] is True
+
+
+def test_selected_zip_remains_downloadable_from_project_manifest(tmp_path, simple_bytes):
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path, sync_jobs=True))) as client:
+        engine = client.app.state.engine
+        p = complete(engine)
+        pid = p.project_id
+        part_id = p.parts[0].part_id
+        response = client.post(
+            '/api/revector/export',
+            json={
+                'project_id': pid,
+                'part_ids': [part_id],
+                'formats': ['svg', 'zip'],
+                'bundle': 'selected_files',
+            },
+        )
+        payload = response.json()
+        assert payload['status'] == 'completed', payload
+        key = payload['result']['exports']['zip']
+        assert '/selected-files-' in key
+
+        # Regression: Engine.load() must not strip the new export manifest key
+        # before the artifact endpoint authorizes the generated ZIP.
+        project = client.get(f'/api/revector/projects/{pid}').json()
+        assert key in project['exports'].values()
+        artifact = client.get(
+            f'/api/revector/projects/{pid}/artifacts/' + key.split(pid + '/')[1]
+        )
+        assert artifact.status_code == 200
+        assert artifact.content.startswith(b'PK')
+
+
+def test_dynamic_component_contract_accepts_more_than_standard_slots():
+    from app.ai.contracts import Candidate
+
+    candidate = Candidate.model_validate(
+        {
+            'part_type': 'LEFT_SIDE_PANEL',
+            'candidate_bbox': [0.1, 0.2, 0.3, 0.4],
+            'confidence': 0.9,
+            'uncertain': False,
+            'notes': 'extra production component',
+        }
+    )
+    assert candidate.part_type == 'LEFT_SIDE_PANEL'

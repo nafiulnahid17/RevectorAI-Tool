@@ -63,7 +63,14 @@ def test_api_staged_workflow(tmp_path, simple_bytes):
             assert client.get("/api/revector/jobs/" + job["job_id"]).json()["status"] == "completed"
         status = client.get(f"/api/revector/projects/{pid}/status").json()
         assert status["true_vector_ready"]
-        result = client.post("/api/revector/export", json={"project_id": pid, "formats": ["svg", "png", "zip"]}).json()
+        result = client.post(
+            "/api/revector/export",
+            json={
+                "project_id": pid,
+                "formats": ["svg", "zip"],
+                "bundle": "production_pack",
+            },
+        ).json()
         assert result["status"] == "completed"
         key=result["result"]["exports"]["zip"]
         artifact = client.get(f"/api/revector/projects/{pid}/artifacts/"+key.split(pid+"/")[1])
@@ -162,7 +169,10 @@ def test_ocr_records_real_results_and_outlines(engine):
     assert all(0 <= result["model_confidence"] <= 1 and result["font_match_status"] == "approximate" for result in full_results + results)
 
 
-@pytest.mark.skipif(not shutil.which("inkscape"), reason="Inkscape CLI unavailable")
+@pytest.mark.skipif(
+    not all(shutil.which(tool) for tool in ("inkscape", "pdfinfo", "pdfimages", "gs")),
+    reason="Inkscape + Poppler + Ghostscript required",
+)
 def test_real_pdf_eps_conversion(engine):
     p = complete(engine)
     result = engine.run(p.project_id, "export", {"formats": ["svg", "pdf", "eps", "zip"]})
