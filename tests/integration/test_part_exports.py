@@ -145,6 +145,9 @@ def test_selected_files_zip_is_distinct_from_production_pack(engine):
         {'part_ids': ids, 'formats': ['svg', 'zip'], 'bundle': 'production_pack'},
     )
     assert selected['exports']['zip'] != pack['exports']['zip']
+    persisted = engine.load(p.project_id).exports
+    assert any(key.startswith('selected_files_') for key in persisted)
+    assert any(key.startswith('production_pack_') for key in persisted)
     with zipfile.ZipFile(BytesIO(engine.storage.get(pack['exports']['zip']))) as archive:
         names = archive.namelist()
         assert any(name.startswith('parts/') for name in names)
