@@ -171,6 +171,75 @@ def rasterize_png(
         return exported
 
 
+def _run_ghostscript_cmyk(
+    source: Path,
+    output: Path,
+    *,
+    format: str,
+    timeout: int,
+) -> None:
+    """Normalize production PDF/EPS to a CMYK, vector-preserving handoff profile."""
+    ghostscript = shutil.which("gs")
+    if not ghostscript:
+        raise EngineError(
+            "EXPORT_VALIDATION_UNAVAILABLE",
+            "Ghostscript is required for CMYK production PDF/EPS output",
+        )
+    device = "eps2write" if format == "eps" else "pdfwrite"
+    args = [
+        ghostscript,
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        f"-sDEVICE={device}",
+        "-sProcessColorModel=DeviceCMYK",
+        "-sColorConversionStrategy=CMYK",
+        "-dOverrideICC",
+    ]
+    if format == "eps":
+        args.extend(["-dLanguageLevel=2", "-dEPSCrop"])
+    else:
+        args.append("-dCompatibilityLevel=1.4")
+    args.extend([f"-sOutputFile={output}", str(source)])
+    result = subprocess.run(
+        args,
+        check=False,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if result.returncode or not output.exists():
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            f"Ghostscript CMYK {format.upper()} normalization failed; SVG is preserved",
+        )
+
+
+def verify_eps_client_profile(data: bytes) -> None:
+    """Enforce the client's CorelDRAW-era EPS interchange profile."""
+    header = data[:4096]
+    if not data.startswith(b"%!PS-Adobe") or b"EPSF-3.0" not in header:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS must declare Adobe EPSF 3.0",
+        )
+    if not re.search(br"%%LanguageLevel:\s*2(?:\D|$)", data[:20000]):
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS must be PostScript Language Level 2",
+        )
+    if b"%%BoundingBox:" not in header and b"%%HiResBoundingBox:" not in data[:20000]:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS is missing a production bounding box",
+        )
+    if b"setcmykcolor" not in data and b"DeviceCMYK" not in data:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS does not expose CMYK color operators",
+        )
+
+
 def convert(
     data: bytes, format: str, timeout: int = 180, mode: str = "true_vector"
 ) -> bytes:
@@ -183,9 +252,12 @@ def convert(
             "EXPORT_CONVERSION_FAILED",
             "Inkscape CLI is unavailable; validated SVG is preserved",
         )
+
     with TemporaryDirectory(prefix="revector-export-") as temp:
         folder = Path(temp)
-        source, output = folder / "source.svg", folder / f"output.{format}"
+        source = folder / "source.svg"
+        raw = folder / f"inkscape-raw.{format}"
+        output = folder / f"output.{format}"
         source.write_bytes(data)
         env = os.environ.copy()
         env["INKSCAPE_PROFILE_DIR"] = str(folder / "profile")
@@ -193,18 +265,29 @@ def convert(
             executable,
             str(source),
             f"--export-type={format}",
-            f"--export-filename={output}",
+            f"--export-filename={raw}",
             "--export-text-to-path",
         ]
         try:
             result = subprocess.run(
-                args, check=False, capture_output=True, timeout=timeout, env=env
+                args,
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+                env=env,
             )
-            if result.returncode or not output.exists():
+            if result.returncode or not raw.exists():
                 raise EngineError(
                     "EXPORT_CONVERSION_FAILED",
                     f"Inkscape {format.upper()} conversion failed; SVG is preserved",
                 )
+
+            _run_ghostscript_cmyk(
+                raw,
+                output,
+                format=format,
+                timeout=timeout,
+            )
             exported = output.read_bytes()
             signature = b"%PDF" if format == "pdf" else b"%!PS"
             if not exported.startswith(signature) or len(exported) < 100:
@@ -212,10 +295,15 @@ def convert(
                     "EXPORT_CONVERSION_FAILED",
                     "Conversion did not produce a valid output signature",
                 )
+            if format == "eps":
+                verify_eps_client_profile(exported)
             verify_conversion(output, format, timeout, mode)
             return exported
+        except EngineError:
+            raise
         except (subprocess.SubprocessError, OSError) as exc:
             raise EngineError(
                 "EXPORT_CONVERSION_FAILED",
-                "Inkscape conversion failed or timed out; SVG is preserved",
+                "Production conversion failed or timed out; SVG is preserved",
             ) from exc
+
