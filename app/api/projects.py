@@ -10,7 +10,12 @@ def public_project(project):
     result = project.model_dump(mode="json")
     result['previews'] = {k:v for k,v in result['previews'].items() if k not in {'vector_view','nodes'}}
     result.pop('assistant_sessions',None)
-    result['exports']={k:v for k,v in result['exports'].items() if k.startswith('selected_zip_')}
+    safe_export_prefixes = ("selected_zip_", "selected_files_", "production_pack_")
+    result["exports"] = {
+        key: value
+        for key, value in result["exports"].items()
+        if key.startswith(safe_export_prefixes)
+    }
     result['true_vector_ready'] = project.true_vector_ready
     result['ai_capabilities'] = {'native_ai_export':False}
     return result
