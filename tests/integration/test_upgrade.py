@@ -41,7 +41,7 @@ class MockArtworkProvider:
         return sheet()[0]
 
     def create_pattern_mockup(self, image, prompt, size):
-        assert "NO DOUBLE COLLARS" in prompt
+        assert "DO NOT force an eight-part template" in prompt
         return sheet()[0]
 
     def identify_parts(self, image):
@@ -117,8 +117,12 @@ def test_review_applies_client_default_physical_dimensions(tmp_path):
     e, p = prepared(tmp_path)
     confirm(e, p)
     current = e.load(p.project_id)
-    assert all(part.physical_width_mm == 558.8 for part in current.parts)
-    assert all(part.physical_height_mm == 787.4 for part in current.parts)
+    bodies = [part for part in current.parts if part.type in {"front_body", "back_body"}]
+    non_bodies = [part for part in current.parts if part.type not in {"front_body", "back_body"}]
+    assert len(bodies) == 2
+    assert all(part.physical_width_mm == 558.8 for part in bodies)
+    assert all(part.physical_height_mm == 787.4 for part in bodies)
+    assert all(part.physical_width_mm is None and part.physical_height_mm is None for part in non_bodies)
 
 
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
@@ -132,7 +136,11 @@ def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e.run(p.project_id, "production")
     p = e.load(p.project_id)
     assert p.true_vector_ready and p.validation["embedded_rasters"] == 0
-    result = e.run(p.project_id, "export", {"formats": ["svg", "zip"]})
+    result = e.run(
+        p.project_id,
+        "export",
+        {"formats": ["svg", "zip"], "bundle": "production_pack"},
+    )
     assert len(result["part_files"]) == 8 and set(result["exports"]) == {"zip"}
     archive = zipfile.ZipFile(BytesIO(e.storage.get(result["exports"]["zip"])))
     assert sum(name.startswith("parts/") for name in archive.namelist()) == 8
