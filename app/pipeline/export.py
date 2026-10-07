@@ -89,6 +89,139 @@ def verify_conversion(path: Path, format: str, timeout: int, mode: str) -> None:
         ) from exc
 
 
+
+def _normalize_print_color(path: Path, format: str, timeout: int) -> None:
+    """Normalize vector print documents through Ghostscript.
+
+    EPS is emitted as EPSF 3.0 / PostScript LanguageLevel 2 in DeviceCMYK.
+    PDF is normalized to a vector-preserving DeviceCMYK print document.
+    Strict raster checks run afterwards, so a conversion that flattens artwork
+    is rejected rather than silently shipped.
+    """
+    ghostscript = shutil.which("gs")
+    if not ghostscript:
+        raise EngineError(
+            "EXPORT_VALIDATION_UNAVAILABLE",
+            "CMYK print normalization requires Ghostscript",
+        )
+    normalized = path.with_name("normalized-" + path.name)
+    common = [
+        ghostscript,
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        "-dAutoRotatePages=/None",
+        "-sProcessColorModel=DeviceCMYK",
+        "-sColorConversionStrategy=CMYK",
+        "-dOverrideICC",
+    ]
+    if format == "eps":
+        args = common + [
+            "-sDEVICE=eps2write",
+            "-dLanguageLevel=2",
+            "-dEPSCrop",
+            f"-sOutputFile={normalized}",
+            str(path),
+        ]
+    elif format == "pdf":
+        args = common + [
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.4",
+            f"-sOutputFile={normalized}",
+            str(path),
+        ]
+    else:
+        raise EngineError("UNSUPPORTED_EXPORT", "CMYK normalization supports PDF/EPS only")
+    try:
+        subprocess.run(
+            args,
+            check=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            f"{format.upper()} CMYK normalization failed; validated SVG is preserved",
+        ) from exc
+    if not normalized.exists() or normalized.stat().st_size < 100:
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            f"{format.upper()} CMYK normalization produced no usable file",
+        )
+    payload = normalized.read_bytes()
+    if format == "eps":
+        header = payload[:4096].decode("latin-1", errors="replace")
+        if not header.startswith("%!PS-Adobe-3.0 EPSF-3.0"):
+            raise EngineError(
+                "EXPORT_STANDARD_MISMATCH",
+                "EPS output is not EPSF 3.0",
+            )
+        if "%%LanguageLevel: 3" in header:
+            raise EngineError(
+                "EXPORT_STANDARD_MISMATCH",
+                "EPS output exceeded PostScript Level 2",
+            )
+    path.write_bytes(payload)
+
+
+def _eps_dsc(data: bytes) -> dict:
+    header = data[:8192].decode("latin-1", errors="replace")
+    bbox = re.search(
+        r"^%%BoundingBox:\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)",
+        header,
+        re.MULTILINE,
+    )
+    hires = re.search(
+        r"^%%HiResBoundingBox:\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s+(-?[0-9.]+)\s+(-?[0-9.]+)",
+        header,
+        re.MULTILINE,
+    )
+    return {
+        "epsf": "3.0" if header.startswith("%!PS-Adobe-3.0 EPSF-3.0") else None,
+        "postscript_level": 2 if "%%LanguageLevel: 3" not in header else 3,
+        "bounding_box_pt": [int(v) for v in bbox.groups()] if bbox else None,
+        "hires_bounding_box_pt": [float(v) for v in hires.groups()] if hires else None,
+    }
+
+
+def output_profile(data: bytes, format: str) -> dict:
+    """Public handoff facts for the generated file; never claims Corel authorship."""
+    base = {
+        "format": format,
+        "resolution_independent": format in {"svg", "pdf", "eps"},
+        "embedded_raster_policy": "none" if format in {"svg", "pdf", "eps"} else "300_dpi_proof",
+    }
+    if format == "eps":
+        return {
+            **base,
+            **_eps_dsc(data),
+            "color_mode": "CMYK",
+            "coreldraw_x8_target": "compatible_interchange",
+            "created_by": "ReVector",
+        }
+    if format == "pdf":
+        return {
+            **base,
+            "color_mode": "CMYK",
+            "created_by": "ReVector",
+        }
+    if format == "svg":
+        return {
+            **base,
+            "color_mode": "RGB_vector_interchange",
+            "created_by": "ReVector",
+        }
+    if format == "png":
+        return {
+            **base,
+            "color_mode": "RGBA",
+            "dpi": 300,
+            "created_by": "ReVector",
+        }
+    return base
+
 def _physical_inches(value: str) -> float | None:
     match = re.fullmatch(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(mm|cm|in|pt|pc)\s*", value or "")
     if not match:
@@ -195,6 +328,7 @@ def convert(
             f"--export-type={format}",
             f"--export-filename={output}",
             "--export-text-to-path",
+            "--export-area-page",
         ]
         try:
             result = subprocess.run(
@@ -205,6 +339,7 @@ def convert(
                     "EXPORT_CONVERSION_FAILED",
                     f"Inkscape {format.upper()} conversion failed; SVG is preserved",
                 )
+            _normalize_print_color(output, format, timeout)
             exported = output.read_bytes()
             signature = b"%PDF" if format == "pdf" else b"%!PS"
             if not exported.startswith(signature) or len(exported) < 100:
@@ -213,6 +348,13 @@ def convert(
                     "Conversion did not produce a valid output signature",
                 )
             verify_conversion(output, format, timeout, mode)
+            if format == "eps":
+                profile = _eps_dsc(exported)
+                if profile.get("epsf") != "3.0" or profile.get("postscript_level") != 2:
+                    raise EngineError(
+                        "EXPORT_STANDARD_MISMATCH",
+                        "EPS must be EPSF 3.0 / PostScript Level 2",
+                    )
             return exported
         except (subprocess.SubprocessError, OSError) as exc:
             raise EngineError(
