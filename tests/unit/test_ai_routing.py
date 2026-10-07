@@ -220,3 +220,18 @@ def test_provider_change_changes_cache_fingerprint():
     old = router.fingerprint()
     p.model = "another-model"
     assert old != router.fingerprint()
+
+
+def test_dynamic_candidate_accepts_nonstandard_real_component():
+    from app.ai.contracts import Candidate
+
+    candidate = Candidate.model_validate(
+        {
+            "part_type": "SIDE_PANEL_02",
+            "candidate_bbox": [0.1, 0.2, 0.3, 0.4],
+            "confidence": 0.9,
+            "uncertain": False,
+            "notes": "Visible detached side panel",
+        }
+    )
+    assert candidate.part_type == "SIDE_PANEL_02"
