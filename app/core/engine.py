@@ -77,8 +77,14 @@ class Engine:
         return project
 
     def load(self, project_id: str) -> Project:
-        p=self.storage.load(project_id)
-        p.exports={k:v for k,v in p.exports.items() if k.startswith('selected_zip_')} if p.stage_metadata.get('export_policy')=='parts_only_v1' else {}
+        p = self.storage.load(project_id)
+        policy = p.stage_metadata.get("export_policy")
+        safe_prefixes = ("selected_zip_", "selected_files_", "production_pack_")
+        p.exports = (
+            {k: v for k, v in p.exports.items() if k.startswith(safe_prefixes)}
+            if policy in {"parts_only_v1", "validated_selected_parts_v2"}
+            else {}
+        )
         return p
 
     def key(self, project: Project, suffix: str) -> str:
