@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from app.ai.contracts import SLOTS, PartSlot
-from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION
+from app.ai.prompts import MASTER_MOCKUP_COMMAND, MOCKUP_VERSION, mockup_runtime_prompt
 from app.ai.image_quality import (
     nearest_supported_ratio,
     preset_quality_label,
@@ -18,9 +18,27 @@ from app.models.project import State, now
 from app.pipeline import geometry, hybrid_detection, segmentation
 
 
-PREPARE_VERSION = "prepare/2.3-stable-699ac010-r1"
-DEFAULT_PART_WIDTH_MM = 558.8
-DEFAULT_PART_HEIGHT_MM = 787.4
+PREPARE_VERSION = "prepare/3.0-dynamic-selective-production"
+BODY_WIDTH_MM = 558.8
+BODY_HEIGHT_MM = 787.4
+
+# Front/back are client-locked. Other values are editable starting production
+# canvases and are applied only when the operator has not supplied dimensions.
+PART_DIMENSION_DEFAULTS_MM = {
+    "front_body": (558.8, 787.4),
+    "back_body": (558.8, 787.4),
+    "left_sleeve": (330.2, 457.2),
+    "right_sleeve": (330.2, 457.2),
+    "front_collar": (254.0, 127.0),
+    "back_collar": (254.0, 127.0),
+    "top_trim": (558.8, 76.2),
+    "bottom_trim": (558.8, 76.2),
+    "trim": (558.8, 76.2),
+    "left_cuff": (254.0, 101.6),
+    "right_cuff": (254.0, 101.6),
+    "left_shoulder": (279.4, 203.2),
+    "right_shoulder": (279.4, 203.2),
+}
 
 
 def _normalize_generated_size(
@@ -149,10 +167,20 @@ class ProductionWorkflow:
                 )
                 image = e.image(source)
                 size = mockup_size
+                analysis_result = p.ai_metadata.get("analysis", {}).get("result", {})
                 args = (
                     (image,)
                     if operation == "analysis"
-                    else (image, MASTER_MOCKUP_COMMAND, size)
+                    else (
+                        image,
+                        mockup_runtime_prompt(
+                            p.settings.mockup_background,
+                            preset_quality_label(p.settings.preset),
+                            size,
+                            analysis_result,
+                        ),
+                        size,
+                    )
                     if operation == "mockup"
                     else (image, size)
                 )
@@ -163,7 +191,8 @@ class ProductionWorkflow:
                     meta.update(
                         mockup_generated=True,
                         prompt_version=MOCKUP_VERSION,
-                        expected_parts=list(SLOTS),
+                        component_policy="dynamic_visible_components",
+                        standard_slot_preset=list(SLOTS),
                         source_hash=p.source_hash,
                         requested_dimensions=list(size),
                         requested_aspect_ratio=nearest_supported_ratio(size),
@@ -235,17 +264,18 @@ class ProductionWorkflow:
                     )
                 part = e._create_part(p, assignment["mask"], fields)
                 if candidate:
-                    slot = p.slots[candidate["part_type"]]
-                    if slot.part_id:
-                        slot.status = "uncertain"
-                    else:
-                        slot.part_id = part.part_id
-                        slot.status = (
-                            "uncertain" if candidate["uncertain"] else "detected"
-                        )
-                        slot.ai_confidence = candidate["confidence"]
-                        slot.candidate_bbox = list(candidate["candidate_bbox"])
-                    slot.notes.append(candidate["notes"])
+                    slot = p.slots.get(candidate["part_type"])
+                    if slot:
+                        if slot.part_id:
+                            slot.status = "uncertain"
+                        else:
+                            slot.part_id = part.part_id
+                            slot.status = (
+                                "uncertain" if candidate["uncertain"] else "detected"
+                            )
+                            slot.ai_confidence = candidate["confidence"]
+                            slot.candidate_bbox = list(candidate["candidate_bbox"])
+                        slot.notes.append(candidate["notes"])
                 p.parts.append(part)
 
             if candidates:
@@ -253,8 +283,10 @@ class ProductionWorkflow:
                     "AI reference fidelity is not certified. Review colors, branding, unseen surfaces and seam continuity before production."
                 )
             p.ai_metadata["detection"] = {
-                "expected_parts": list(SLOTS),
+                "standard_slot_preset": list(SLOTS),
+                "component_policy": "dynamic_visible_components",
                 "detected_candidates": candidates,
+                "detected_component_count": len(p.parts),
                 "missing_parts": [
                     key for key, value in p.slots.items() if value.status == "missing"
                 ],
@@ -281,58 +313,89 @@ class ProductionWorkflow:
             "slots": {key: value.model_dump() for key, value in p.slots.items()},
         }
 
-    def review(self, pid, decisions):
+    def _apply_client_dimensions(self, part) -> None:
+        """Apply production defaults without overriding operator sizes.
+
+        Front/back body size is an explicit client contract and is always locked
+        to 22 x 31 inches. Other known parts get editable defaults only when no
+        physical size has been supplied.
+        """
+        if part.type in {"front_body", "back_body"}:
+            part.physical_width_mm = BODY_WIDTH_MM
+            part.physical_height_mm = BODY_HEIGHT_MM
+            return
+        default = PART_DIMENSION_DEFAULTS_MM.get(part.type)
+        if default and part.physical_width_mm is None:
+            part.physical_width_mm, part.physical_height_mm = default
+
+    def review(self, pid, decisions, selected_part_ids=None):
         e = self.engine
         with e.storage.lock(pid):
             p = e.load(pid)
-            if set(decisions) != set(SLOTS):
-                raise EngineError(
-                    "PART_REVIEW_REQUIRED",
-                    "Resolve all eight expected slots before production",
-                    status=409,
-                )
-            ids = []
-            for name, decision in decisions.items():
-                if decision["status"] == "blank":
-                    continue
-                part = next(
-                    (a for a in p.parts if a.part_id == decision.get("part_id")), None
-                )
-                if not part or part.type != name.lower() or not part.confirmed:
-                    raise EngineError(
-                        "PART_REVIEW_REQUIRED",
-                        "Each nonblank slot requires a confirmed part of the matching type",
-                        status=409,
-                    )
-                if part.physical_width_mm is None:
-                    part.physical_width_mm = DEFAULT_PART_WIDTH_MM
-                    part.physical_height_mm = DEFAULT_PART_HEIGHT_MM
-                if part.part_id in ids:
-                    raise EngineError(
-                        "PART_REVIEW_REQUIRED",
-                        "A component cannot fill more than one slot",
-                        status=409,
-                    )
-                ids.append(part.part_id)
+
+            decision_ids = [
+                decision.get("part_id")
+                for decision in (decisions or {}).values()
+                if decision.get("status") == "confirmed" and decision.get("part_id")
+            ]
+            ids = list(selected_part_ids or decision_ids)
             if not ids:
                 raise EngineError(
                     "PART_REVIEW_REQUIRED",
-                    "Select at least one real production component",
+                    "Select at least one detected component for vectorization",
                     status=409,
                 )
-            if set(ids) != {part.part_id for part in p.parts}:
+            if len(ids) != len(set(ids)):
                 raise EngineError(
                     "PART_REVIEW_REQUIRED",
-                    "Remove or classify extra components before confirming the review",
+                    "A component can be selected only once",
                     status=409,
                 )
-            for name, d in decisions.items():
-                p.slots[name] = PartSlot(
-                    part_type=name,
-                    status="blank" if d["status"] == "blank" else "confirmed",
-                    part_id=d.get("part_id") if d["status"] != "blank" else None,
-                )
-            p.ai_metadata["review"] = {"confirmed": True, "timestamp": now()}
+
+            selected = []
+            for part_id in ids:
+                part = next((a for a in p.parts if a.part_id == part_id), None)
+                if not part:
+                    raise EngineError(
+                        "PART_NOT_FOUND",
+                        "Selected production component no longer exists",
+                        status=404,
+                    )
+                if not part.confirmed:
+                    raise EngineError(
+                        "PART_REVIEW_REQUIRED",
+                        "Every selected component must be reviewed and confirmed before vectorization",
+                        status=409,
+                    )
+                self._apply_client_dimensions(part)
+                part.processing_state = "CONFIRMED"
+                selected.append(part)
+
+            # Slot decisions are now optional compatibility metadata. They never
+            # gate dynamic/extra components or force all eight standard slots.
+            for name, decision in (decisions or {}).items():
+                if name not in p.slots:
+                    continue
+                if decision.get("status") == "blank":
+                    p.slots[name] = PartSlot(part_type=name, status="blank")
+                    continue
+                part_id = decision.get("part_id")
+                part = next((a for a in p.parts if a.part_id == part_id), None)
+                if part and part.confirmed and part.type == name.lower():
+                    p.slots[name] = PartSlot(
+                        part_type=name,
+                        status="confirmed",
+                        part_id=part.part_id,
+                        ai_confidence=part.ai_confidence,
+                    )
+
+            p.ai_metadata["review"] = {
+                "confirmed": True,
+                "selected_part_ids": ids,
+                "selected_count": len(ids),
+                "timestamp": now(),
+                "policy": "selective_dynamic_components",
+            }
             e.invalidate(p, "compose")
             p.state = State.SEGMENTED
             e.storage.save(p)
@@ -341,13 +404,34 @@ class ProductionWorkflow:
     def production(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:
         e = self.engine
         p = e.load(pid)
-        if not p.ai_metadata.get("review", {}).get("confirmed"):
+        review = p.ai_metadata.get("review", {})
+        if not review.get("confirmed"):
             raise EngineError(
                 "PART_REVIEW_REQUIRED",
-                "Confirm the eight-slot review before automatic production",
+                "Confirm at least one selected component before vector production",
                 status=409,
             )
-        parts = e.selected(p, params)
+
+        requested_ids = (
+            [params["part_id"]]
+            if params.get("part_id")
+            else params.get("part_ids") or review.get("selected_part_ids")
+        )
+        if not requested_ids:
+            raise EngineError(
+                "PART_REVIEW_REQUIRED",
+                "No components are selected for vector production",
+                status=409,
+            )
+        reviewed = set(review.get("selected_part_ids") or [])
+        if reviewed and not set(requested_ids).issubset(reviewed):
+            raise EngineError(
+                "PART_REVIEW_REQUIRED",
+                "Production selection contains a component that was not confirmed in the current review",
+                status=409,
+            )
+
+        parts = e.selected(p, {"part_ids": requested_ids})
         failures = []
         for part in parts:
             if cancelled():
@@ -375,9 +459,9 @@ class ProductionWorkflow:
                 self.event(pid, "VECTOR_READY", part.part_id)
                 with e.storage.lock(pid):
                     current = e.load(pid)
-                    next(
-                        a for a in current.parts if a.part_id == part.part_id
-                    ).error = None
+                    item = next(a for a in current.parts if a.part_id == part.part_id)
+                    item.error = None
+                    item.processing_state = "VECTOR_READY"
                     e.storage.save(current)
             except EngineError as exc:
                 if exc.code == "JOB_CANCELLED":
@@ -405,31 +489,56 @@ class ProductionWorkflow:
                     item.processing_state = "FAILED"
                     failures.append(item.error)
                     e.storage.save(current)
+
         if failures:
             raise EngineError(
                 "PART_VECTOR_FAILED",
-                "Some parts failed. Completed part vectors are preserved; retry only the failed parts.",
-                diagnostics={"parts": failures},
+                "Some selected parts failed. Completed vectors are preserved; retry, review or exclude the failed part.",
+                diagnostics={"parts": failures, "selected_part_ids": list(requested_ids)},
             )
+
         current = e.load(pid)
+        selected_now = [
+            a for a in current.parts if a.part_id in set(requested_ids)
+        ]
         if any(
             not a.vector or not a.cache.get("optimize") or a.error
-            for a in current.parts
+            for a in selected_now
         ):
             raise EngineError(
-                "PART_VECTOR_FAILED", "Other failed parts still require recovery"
+                "PART_VECTOR_FAILED",
+                "A selected component is not ready for validation",
             )
-        e.run(pid, "compose", job_id=params.get("_job_id"), cancelled=cancelled)
+
+        selection = {"part_ids": list(requested_ids)}
+        e.run(
+            pid,
+            "compose",
+            selection,
+            job_id=params.get("_job_id"),
+            cancelled=cancelled,
+        )
         self.event(pid, "VALIDATING_VECTOR")
         try:
             result = e.run(
-                pid, "validate", job_id=params.get("_job_id"), cancelled=cancelled
+                pid,
+                "validate",
+                selection,
+                job_id=params.get("_job_id"),
+                cancelled=cancelled,
             )
         except EngineError:
             self.event(pid, "VALIDATION_FAILED")
             raise
+
+        with e.storage.lock(pid):
+            current = e.load(pid)
+            for item in current.parts:
+                if item.part_id in set(requested_ids):
+                    item.processing_state = "EXPORT_READY"
+            e.storage.save(current)
         self.event(pid, "VALIDATION_PASSED")
-        self.event(pid, "EXPORT_READY")
+        self.event(pid, "EXPORT_READY", selected_part_ids=list(requested_ids))
         return result
 
     def missing(self, pid: str, params: dict, cancelled: Callable[[], bool]) -> dict:

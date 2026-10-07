@@ -31,9 +31,12 @@ def test_part_measurements_in_export_and_selective_zip(engine):
     assert root.get('height') == '720.000000mm'
     assert any(e.get('id', '').endswith('BLEED_PATH') for e in root.iter())
     with zipfile.ZipFile(BytesIO(engine.storage.get(result['exports']['zip']))) as archive:
-        assert 'master.svg' not in archive.namelist()
-        assert sum(name.startswith('parts/') for name in archive.namelist()) == 1
-        assert not any(second.part_id in name for name in archive.namelist())
+        names = archive.namelist()
+        assert 'master.svg' not in names
+        assert len(names) == 1
+        assert names[0].endswith('.svg')
+        assert first.part_id in names[0]
+        assert not any(second.part_id in name for name in names)
     assert p.project_id in result['part_files'][first.part_id]['svg']
 
 
@@ -131,3 +134,24 @@ def test_selected_files_zip_is_distinct_from_production_pack(engine):
         assert any(name.startswith('metadata/') for name in names)
         assert any(name.startswith('previews/') for name in names)
         assert 'README.txt' in names
+
+
+def test_selected_bundle_remains_in_manifest_for_download(tmp_path, simple_bytes):
+    with TestClient(create_app(Settings(allow_unauthenticated=True, data_dir=tmp_path, sync_jobs=True))) as client:
+        engine = client.app.state.engine
+        p = complete(engine)
+        ids = [p.parts[0].part_id]
+        result = engine.run(
+            p.project_id,
+            "export",
+            {"part_ids": ids, "formats": ["svg", "zip"], "bundle": "selected_files"},
+        )
+        key = result["exports"]["zip"]
+        public = client.get(f"/api/revector/projects/{p.project_id}").json()
+        assert key in public["exports"].values()
+        relative = key.split(p.project_id + "/", 1)[1]
+        response = client.get(
+            f"/api/revector/projects/{p.project_id}/artifacts/{relative}"
+        )
+        assert response.status_code == 200
+        assert response.content.startswith(b"PK")

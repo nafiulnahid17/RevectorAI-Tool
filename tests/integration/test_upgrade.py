@@ -113,12 +113,20 @@ def test_new_project_default_mockup_canvas_is_four_three():
     assert (settings.mockup_width, settings.mockup_height) == (1536, 1152)
 
 
-def test_review_applies_client_default_physical_dimensions(tmp_path):
+def test_review_applies_client_body_dimensions_and_part_defaults(tmp_path):
     e, p = prepared(tmp_path)
     confirm(e, p)
     current = e.load(p.project_id)
-    assert all(part.physical_width_mm == 558.8 for part in current.parts)
-    assert all(part.physical_height_mm == 787.4 for part in current.parts)
+    by_type = {part.type: part for part in current.parts}
+    for name in ("front_body", "back_body"):
+        assert by_type[name].physical_width_mm == 558.8
+        assert by_type[name].physical_height_mm == 787.4
+    for name in ("left_sleeve", "right_sleeve"):
+        assert by_type[name].physical_width_mm == 330.2
+        assert by_type[name].physical_height_mm == 457.2
+    for name in ("front_collar", "back_collar"):
+        assert by_type[name].physical_width_mm == 254.0
+        assert by_type[name].physical_height_mm == 127.0
 
 
 def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
@@ -132,7 +140,11 @@ def test_full_eight_slot_pipeline_exports_only_parts(tmp_path):
     e.run(p.project_id, "production")
     p = e.load(p.project_id)
     assert p.true_vector_ready and p.validation["embedded_rasters"] == 0
-    result = e.run(p.project_id, "export", {"formats": ["svg", "zip"]})
+    result = e.run(
+        p.project_id,
+        "export",
+        {"formats": ["svg", "zip"], "bundle": "production_pack"},
+    )
     assert len(result["part_files"]) == 8 and set(result["exports"]) == {"zip"}
     archive = zipfile.ZipFile(BytesIO(e.storage.get(result["exports"]["zip"])))
     assert sum(name.startswith("parts/") for name in archive.namelist()) == 8
@@ -203,6 +215,78 @@ def test_no_credentials_keeps_deterministic_path_and_no_fabricated_slots(tmp_pat
     with pytest.raises(EngineError):
         e.run(p.project_id, "production")
 
+
+
+def test_two_selected_parts_vectorize_without_eight_slot_confirmation(tmp_path):
+    e, p = prepared(tmp_path)
+    chosen = [
+        next(part for part in p.parts if part.type == "front_body"),
+        next(part for part in p.parts if part.type == "back_body"),
+    ]
+    for part in chosen:
+        e.manual(p.project_id, "confirm", part.part_id, {})
+
+    decisions = {
+        part.type.upper(): {"status": "confirmed", "part_id": part.part_id}
+        for part in chosen
+    }
+    selected_ids = [part.part_id for part in chosen]
+    e.workflow.review(p.project_id, decisions, selected_part_ids=selected_ids)
+
+    result = e.run(
+        p.project_id,
+        "production",
+        {"part_ids": selected_ids},
+    )
+    current = e.load(p.project_id)
+
+    assert result["validation"]["status"] == "PASS"
+    assert result["validation"]["selected_part_ids"] == selected_ids
+    assert current.true_vector_ready
+    assert all(
+        part.validation and part.validation["resolution_independent"]
+        for part in current.parts
+        if part.part_id in selected_ids
+    )
+    assert all(
+        part.validation is None
+        for part in current.parts
+        if part.part_id not in selected_ids
+    )
+    assert all(
+        (part.physical_width_mm, part.physical_height_mm) == (558.8, 787.4)
+        for part in current.parts
+        if part.part_id in selected_ids
+    )
+
+    exported = e.run(
+        p.project_id,
+        "export",
+        {
+            "part_ids": selected_ids,
+            "formats": ["svg", "zip"],
+            "bundle": "selected_files",
+        },
+    )
+    assert set(exported["part_files"]) == set(selected_ids)
+    with zipfile.ZipFile(BytesIO(e.storage.get(exported["exports"]["zip"]))) as archive:
+        assert len(archive.namelist()) == 2
+        assert all(name.endswith(".svg") for name in archive.namelist())
+
+
+def test_dynamic_candidate_contract_accepts_non_slot_component():
+    from app.ai.contracts import Candidate
+
+    candidate = Candidate.model_validate(
+        {
+            "part_type": "LEFT_CUFF",
+            "candidate_bbox": [0.1, 0.1, 0.2, 0.2],
+            "confidence": 0.8,
+            "uncertain": False,
+            "notes": "Visible separate cuff",
+        }
+    )
+    assert candidate.part_type == "LEFT_CUFF"
 
 def test_api_errors_normalized_and_master_artifact_denied(tmp_path):
     with TestClient(
