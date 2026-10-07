@@ -77,10 +77,17 @@ class Engine:
         return project
 
     def load(self, project_id: str) -> Project:
-        # Export manifests are already invalidated whenever vectors/validation change.
-        # Never strip current selected-files/production-pack keys on read; doing so
-        # makes a successfully generated ZIP immediately unreachable by /artifacts.
-        return self.storage.load(project_id)
+        p = self.storage.load(project_id)
+        # Never inherit assembled/master download records from older projects.
+        # Keep only current part-only bundle manifests that actually exist in storage.
+        p.exports = {
+            key: value
+            for key, value in p.exports.items()
+            if key.startswith(("selected_zip_", "selected_files_", "production_pack_"))
+            and value
+            and self.storage.exists(value)
+        }
+        return p
 
     def key(self, project: Project, suffix: str) -> str:
         return f"projects/{project.project_id}/{suffix}"
@@ -701,9 +708,16 @@ class Engine:
                 )
                 continue
 
-            if part.type in {"front_body", "back_body"} and (
-                abs((part.physical_width_mm or 0) - 558.8) > 0.01
-                or abs((part.physical_height_mm or 0) - 787.4) > 0.01
+            client_selected_ids = set(
+                p.ai_metadata.get("review", {}).get("selected_part_ids", [])
+            )
+            if (
+                part.part_id in client_selected_ids
+                and part.type in {"front_body", "back_body"}
+                and (
+                    abs((part.physical_width_mm or 0) - 558.8) > 0.01
+                    or abs((part.physical_height_mm or 0) - 787.4) > 0.01
+                )
             ):
                 failures.append(
                     {
