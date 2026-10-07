@@ -171,40 +171,130 @@ def rasterize_png(
         return exported
 
 
+def _run_ghostscript_cmyk(
+    source_pdf: Path,
+    output: Path,
+    format: str,
+    timeout: int,
+) -> None:
+    """Produce deterministic CMYK handoff output without rasterizing vector artwork."""
+    ghostscript = shutil.which("gs")
+    if not ghostscript:
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            "Ghostscript is required for CMYK production PDF/EPS export",
+        )
+
+    if format == "eps":
+        device_args = [
+            "-sDEVICE=eps2write",
+            "-dLanguageLevel=2",
+            "-dEPSCrop",
+        ]
+    elif format == "pdf":
+        device_args = [
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.6",
+        ]
+    else:
+        raise EngineError("UNSUPPORTED_EXPORT", "CMYK conversion supports PDF/EPS only")
+
+    args = [
+        ghostscript,
+        "-q",
+        "-dSAFER",
+        "-dBATCH",
+        "-dNOPAUSE",
+        *device_args,
+        "-sProcessColorModel=DeviceCMYK",
+        "-sColorConversionStrategy=CMYK",
+        "-dOverrideICC",
+        f"-sOutputFile={output}",
+        str(source_pdf),
+    ]
+    result = subprocess.run(
+        args,
+        check=False,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if result.returncode or not output.exists():
+        raise EngineError(
+            "EXPORT_CONVERSION_FAILED",
+            f"Ghostscript CMYK {format.upper()} conversion failed; SVG is preserved",
+        )
+
+
+def _verify_eps_level2_profile(path: Path) -> None:
+    header = path.read_bytes()[:16384].decode("latin-1", errors="replace")
+    first_line = header.splitlines()[0] if header else ""
+    if "EPSF-3.0" not in first_line:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is not EPSF 3.0",
+        )
+    if "%%LanguageLevel: 2" not in header:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is not PostScript LanguageLevel 2",
+        )
+    if "%%BoundingBox:" not in header:
+        raise EngineError(
+            "EXPORT_PROFILE_MISMATCH",
+            "EPS output is missing a production BoundingBox",
+        )
+
+
 def convert(
     data: bytes, format: str, timeout: int = 180, mode: str = "true_vector"
 ) -> bytes:
+    """Export production vector PDF/EPS.
+
+    SVG is first converted to vector PDF with text outlined, then Ghostscript
+    rewrites it using DeviceCMYK. EPS additionally targets EPSF 3.0 and
+    PostScript LanguageLevel 2. Strict parser checks reject rasterization.
+    """
     if format not in {"pdf", "eps"}:
-        raise EngineError("UNSUPPORTED_EXPORT", "Inkscape export supports PDF/EPS only")
+        raise EngineError("UNSUPPORTED_EXPORT", "Production export supports PDF/EPS only")
     approve(data, mode)
-    executable = shutil.which("inkscape")
-    if not executable:
+
+    inkscape = shutil.which("inkscape")
+    if not inkscape:
         raise EngineError(
             "EXPORT_CONVERSION_FAILED",
             "Inkscape CLI is unavailable; validated SVG is preserved",
         )
+
     with TemporaryDirectory(prefix="revector-export-") as temp:
         folder = Path(temp)
-        source, output = folder / "source.svg", folder / f"output.{format}"
+        source = folder / "source.svg"
+        intermediate = folder / "intermediate.pdf"
+        output = folder / f"output.{format}"
         source.write_bytes(data)
+
         env = os.environ.copy()
         env["INKSCAPE_PROFILE_DIR"] = str(folder / "profile")
-        args = [
-            executable,
-            str(source),
-            f"--export-type={format}",
-            f"--export-filename={output}",
-            "--export-text-to-path",
-        ]
         try:
             result = subprocess.run(
-                args, check=False, capture_output=True, timeout=timeout, env=env
+                [
+                    inkscape,
+                    str(source),
+                    "--export-type=pdf",
+                    f"--export-filename={intermediate}",
+                    "--export-text-to-path",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+                env=env,
             )
-            if result.returncode or not output.exists():
+            if result.returncode or not intermediate.exists():
                 raise EngineError(
                     "EXPORT_CONVERSION_FAILED",
-                    f"Inkscape {format.upper()} conversion failed; SVG is preserved",
+                    "Inkscape vector PDF conversion failed; SVG is preserved",
                 )
+
+            _run_ghostscript_cmyk(intermediate, output, format, timeout)
             exported = output.read_bytes()
             signature = b"%PDF" if format == "pdf" else b"%!PS"
             if not exported.startswith(signature) or len(exported) < 100:
@@ -212,10 +302,15 @@ def convert(
                     "EXPORT_CONVERSION_FAILED",
                     "Conversion did not produce a valid output signature",
                 )
+            if format == "eps":
+                _verify_eps_level2_profile(output)
             verify_conversion(output, format, timeout, mode)
             return exported
+        except EngineError:
+            raise
         except (subprocess.SubprocessError, OSError) as exc:
             raise EngineError(
                 "EXPORT_CONVERSION_FAILED",
-                "Inkscape conversion failed or timed out; SVG is preserved",
+                "Production CMYK conversion failed or timed out; SVG is preserved",
             ) from exc
+
