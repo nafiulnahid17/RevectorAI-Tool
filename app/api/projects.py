@@ -117,11 +117,7 @@ def artifact(project_id: str, artifact_path: str, request: Request):
         allowed.update(part.exports.values())
         allowed.update(part.previews.values())
     allowed.add(request.app.state.engine.key(p, "reports/validation.json"))
-    export_artifact = (
-        artifact_path.startswith("exports/")
-        and request.app.state.engine.storage.exists(key)
-    )
-    if (key not in allowed and not export_artifact) or not request.app.state.engine.storage.exists(key):
+    if key not in allowed or not request.app.state.engine.storage.exists(key):
         raise HTTPException(404, "Artifact does not exist in the current project manifest")
     return FileResponse(request.app.state.engine.storage.path(key), filename=artifact_path.rsplit("/", 1)[-1],
                         headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox"})
